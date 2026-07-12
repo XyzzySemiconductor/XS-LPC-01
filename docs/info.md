@@ -9,11 +9,9 @@ You can also include images in this folder and reference them in the markdown. E
 
 ## How it works
 
-Function: upon power up, and every 24hrs, chip turns on the pump, and using a current transformer (CT) measures the 6 Hz RMS current and observe a current drop indicating the tank has been emptied, or until a timeout has occured and then turn off the pump. Leds indicate status, and button allows starting a pump out operation at any time.
+A pump-out chip runs a pump until the tank is empty. The chips funciton is upon power up, and every 24hrs, turn on the pump, and using a current transformer (CT) measures the 60 Hz RMS current and observe a current drop indicating the tank has been emptied, or until a timeout has occured and then turn off the pump. Leds indicate status, and button allows starting a pump out operation at any time.
 
-I like to start with a new chip design with a vision, in the form of a technical datasheet.
-
-datasheet page: [Preliminary Datasheet](LPC_Datasheet.pdf)
+A chip starts with a [Datasheet](LPC_Datasheet.pdf)
 
 ## How to test
 
