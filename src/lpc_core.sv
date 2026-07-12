@@ -20,7 +20,7 @@ module lpc_core (
 	output logic adc_clk,	// shift clk to adc
 	output logic adc_din,  // shift data input to adc
 	 input logic adc_dout // shift data output from adc
-	)
+);
 
 endmodule
 	
