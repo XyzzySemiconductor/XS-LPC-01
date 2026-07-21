@@ -22,9 +22,11 @@ module lpc_core (
 	 input logic adc_miso 	// shift data output from adc
 );
 
-	wire dummy;
-	assign dummy = &{ clk, reset, button, period_sw, timeout_sw, setup_sw, adc_miso };
-	assign { time_led,fault_led,run_led,pump_out,adc_ncs,adc_clk,adc_mosi } = 0;
+	reg [15:0] state;
+	always_ff @(posedge clk) 
+		state <= ( reset ) ? 0 : state + &{ clk, reset, button, period_sw, timeout_sw, setup_sw, adc_miso };
+	assign { time_led,fault_led,run_led,pump_out,adc_ncs,adc_clk,adc_mosi } = state;
+    
 
 endmodule
 	
