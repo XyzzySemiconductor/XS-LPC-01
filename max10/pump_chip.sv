@@ -281,7 +281,11 @@ module pump_chip
 
 	
 	//////////////////////////////
-   // HDMI Scope input connections
+	//////////////////////////////
+	//
+   // HDMI Scope Probes
+	//
+	//////////////////////////////
 	//////////////////////////////
 
 	// Scope capture 8bits of digitial and 5 analog (12bit) inputs for each strobe.
@@ -321,13 +325,23 @@ module pump_chip
 		
 	// monitor 5x 12-bit analog channels
 	
-	assign mad_a0 = 12'h7ff ^ 0;
-	assign mad_a1 = 12'h7ff ^ 0;
-	assign mad_b0 = 12'h7ff ^ 0;
-	assign mad_b1 = 12'h7ff ^ 0;
+	assign mad_a0 = 12'h7ff ^ din0;
+	assign mad_a1 = 12'h7ff ^ din1;
+	assign mad_b0 = 12'h7ff ^ dout0;
+	assign mad_b1 = 12'h7ff ^ dout1;
 	assign iest   = 12'h7ff ^ 0;
 							
-
+	// Fast Scope is used to capture fast SPI comms signalling.
+	// Fast scope is 5 binary channels (cs+4data). Scope triggers on rising CS, restarting at 1Hz. Use any fast clk (6Mhz to 192Mhz), displays in window.
+	logic fast_clk;
+	logic fast_cs;
+	logic [3:0] fast_data;
+	
+	// Fast scope Inputs
+	assign fast_clk = clk_out; //(6mhz)
+	assign fast_cs = adc_ncs; // triggered on rising edge
+	assign fast_data = { adc_ncs, adc_clk, adc_mosi, adc_miso }; // bottom to top
+	
 	/////////////////////////////////
 	////
 	////       FPGA System
@@ -888,7 +902,37 @@ module pump_chip
 	//	.blue(  tinyb_blue )
 	//);
 	assign tinyb = |{ tinyb_red, tinyb_green, tinyb_blue };	
-		
+
+	// 5ch digital oversampled scope on serial ADC inputs
+	logic [7:0] fast_red, fast_green, fast_blue;
+	logic fast;
+	vga_fast_capture #(
+		.V_HEIGHT( 40 ), // 96 or 192 options
+		.V_START ( 320 ),
+		.H_START	( 529 ),
+		.H_END 	( 784 ),
+		.N       ( 60   ), // 60 Hz frames per col pel
+		.GD_COLOR( 24'h404040 /* smpte_deep_violet */ ), 
+		.BG_COLOR( 24'h00214c /* smpte_oxford_blue */ ) //24'h1d1d1d /* smpte_eerie_black */ )	
+	) i_fast_scope (
+		.clk(   hdmi_clk ),
+		.reset( reset ),
+		// video sync 
+		.blank( blank ), 
+		.hsync( hsync ),
+		.vsync( vsync ),
+		// capture inputs
+		.clk_fast( fast_clk ),
+		.ad_cs( fast_cs ),
+		.ad_data( fast_data ),
+		// video output
+		.red(   fast_red ),
+		.green( fast_green ),
+		.blue(  fast_blue )
+	);	
+	assign fast = |{fast_red, fast_green, fast_blue};	
+
+	
 	// 12 bit resistance number is 6.5. so 
 	// plotting as 8.4 with { 2`b00, in[10:1] } will give Ohms. A decimal point woudl be nice
 	logic [4:0] res_str;
@@ -1010,9 +1054,9 @@ module pump_chip
 		// YUV mode input
 		.yuv_mode		( blipvert ), // use YUV2 mode, cheap USb capture devices provice lossless YUV2 capture mode 
 		// RBG Data
-		.red	( (blipvert) ? bv_vdata[7:0]  : ((( tiny | tinyb ) ? (tiny_red   | tinyb_red  ) : wave_scope_red   ) | overlay_red   ) ),
-		.green( (blipvert) ? bv_vdata[15:8] : ((( tiny | tinyb ) ? (tiny_green | tinyb_green) : wave_scope_green ) | overlay_green ) ),
-		.blue	( (blipvert) ? 8'h00          : ((( tiny | tinyb ) ? (tiny_blue  | tinyb_blue ) : wave_scope_blue  ) | overlay_blue  ) ),
+		.red	( (blipvert) ? bv_vdata[7:0]  : ((( tiny | tinyb | fast) ? (tiny_red   | tinyb_red  | fast_red  ) : wave_scope_red   ) | overlay_red   ) ),
+		.green( (blipvert) ? bv_vdata[15:8] : ((( tiny | tinyb | fast) ? (tiny_green | tinyb_green| fast_green) : wave_scope_green ) | overlay_green ) ),
+		.blue	( (blipvert) ? 8'h00          : ((( tiny | tinyb | fast) ? (tiny_blue  | tinyb_blue | fast_blue ) : wave_scope_blue  ) | overlay_blue  ) ),
 		.hdmi_data( hdmi_data ),
 		.dvi_data( dvi_data )
 	);
@@ -1230,40 +1274,4 @@ module blipvert (
 endmodule
 
 
-// external adc sim block
-module adcsim (
-        // system
-        input logic clk,
-        input logic reset,
-        // ADC simulator connections, parallel in, serial out
-        input logic [3:0][11:0] ad_in,
-        output logic [3:0] ad_out,
-        // driven by sampled falling edge of cs
-        input logic ad_cs
-    );
 
-    logic [19:0] cs_del;
-    always_ff @(posedge clk)
-      if( reset ) begin
-        cs_del <= 0;
-      end else begin
-        cs_del <= { cs_del[18:0], ad_cs };
-      end
-    logic [19:0] cs_trig;
-    assign cs_trig[18:0] =  cs_del[19:0] &~{ cs_del[18:0], ad_cs };
-    logic [3:0][11:0] hold;
-    always_ff @(posedge clk) begin
-      if( reset ) begin
-        hold <= 0;
-      end else begin
-        hold[0] <= ( cs_trig[0] ) ? ( ad_in[0] ^ 12'h800 ) : ( |cs_trig[12-:12] ) ? { hold[0][10:0], 1'b0 } : hold[0];
-        hold[1] <= ( cs_trig[0] ) ? ( ad_in[1] ^ 12'h800 ) : ( |cs_trig[12-:12] ) ? { hold[1][10:0], 1'b0 } : hold[1];
-        hold[2] <= ( cs_trig[0] ) ? ( ad_in[2] ^ 12'h800 ) : ( |cs_trig[12-:12] ) ? { hold[2][10:0], 1'b0 } : hold[2];
-        hold[3] <= ( cs_trig[0] ) ? ( ad_in[3] ^ 12'h800 ) : ( |cs_trig[12-:12] ) ? { hold[3][10:0], 1'b0 } : hold[3];
-      end
-    end
-    assign ad_out[0] = hold[0][11];
-    assign ad_out[1] = hold[1][11];
-    assign ad_out[2] = hold[2][11];
-    assign ad_out[3] = hold[3][11];
-endmodule
