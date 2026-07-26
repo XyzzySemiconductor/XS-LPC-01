@@ -35,7 +35,7 @@ module lpc_core (
 	////////////////
 
 	// ADC serial interface
-	logic sdata, schan, sdval, sstrb;
+	logic stick, sdata, schan, sdval, sstrb;
 	adc_spi_master i_adcif (
     	// Input clock,
     	.clk	( clk ),
@@ -47,6 +47,7 @@ module lpc_core (
     	.ad_mosi( adc_mosi ),
     	.ad_miso( adc_miso ),
     	// ADC monitor outputs
+    	.tick( stick ), // sample cycle begin
     	.dout( sdata ), // serial output
     	.chan( schan ), // Indicate chan 0 or 1
     	.dval( sdval ), // Indicates valid bit 
@@ -238,6 +239,8 @@ cos_rom[31] = 9'dx;
 	logic adc_src; // select acd as input
 	logic sel_a; // select a (sin) as mutliplicand this cyclew, else b (cos)
 	logic sclr; // clear addressed acc this cycle (if wr_acc = 1)
+	logic sload; // clear addressed acc this cycle (if wr_acc = 1)
+	logic clr_acc; // clear the accumulators
 	logic wr_acc; // write acc this cycle
 
 	// Select multiplier bit
@@ -254,77 +257,176 @@ cos_rom[31] = 9'dx;
 	// Sign register
 	always @(posedge clk) 
 		sign <= ( reset ) ? 0 :
-				( ld_sign ) ? mult_bit : sign;
+				( ld_sign && adc_src ) ? sdata: 
+				( ld_sign ) ? read_data[31] : sign;
 
 	// Srega/b
 	always @(posedge clk) 
 		sregb <= ( reset ) ? 0 :
-				 ( ld_sq ) ? { read_data[35-:12], 11'h000 } : 
+				 ( ld_sq ) ? { read_data[31-:12], 11'h000 } : 
 				 ( ld_trig ) ? { cos[11:0], 11'h000 } :
 				 ( shr_b  ) ? { sregb[22], sregb[22:1] } : // >>>
 							 sregb;
 	always @(posedge clk) 
 		srega <= ( reset ) ? 0 :
-				 ( ld_sq ) ? { read_data[35-:12], 11'h000 } : 
+				 ( ld_sq ) ? { read_data[31-:12], 11'h000 } : 
 				 ( ld_trig)? { sin[11:0], 11'h000 } :
 				 ( shr_a ) ? { srega[22], srega[22:1] } : // >>>
 				 ( shl_a ) ? { srega[21:0], 1'b0 } : // <<<
 							   srega;
 
 	// word addition
+	logic [22:0] src;
+	assign src = ( sel_a ) ? srega : sregb;
 	logic signed [35:0] suma, sumb, sum;
 	assign suma = read_data;
-	assign sumb = ( !mult_bit ) ? 0 : ( sel_a ) ? srega : sregb;
-	assign sum  = ( sclr ) ? 0 : 
+	assign sumb = ( sload ) ? { {24{src[22]}},src[22-:12] } :
+                  ( !(mult_bit^sign) ) ? 0 : { {13{src[22]}}, src };
+	assign sum  = 
+				  ( sclr & !sload ) ? 0 : 
                   ( sign ) ? suma - sumb : suma + sumb;
 	
 	// Accumulators
 	always_ff @(posedge clk) begin
-		acc_ct_sin <= ( reset ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ct_sin;
-		acc_ct_cos <= ( reset ) ? 0 : ( wr_acc && addr == 1 ) ? sum : acc_ct_cos;
-		acc_ref_sin<= ( reset ) ? 0 : ( wr_acc && addr == 2 ) ? sum : acc_ref_sin;
-		acc_ref_cos<= ( reset ) ? 0 : ( wr_acc && addr == 3 ) ? sum : acc_ref_cos;
+		acc_ct_sin <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ct_sin;
+		acc_ct_cos <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 1 ) ? sum : acc_ct_cos;
+		acc_ref_sin<= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 2 ) ? sum : acc_ref_sin;
+		acc_ref_cos<= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 3 ) ? sum : acc_ref_cos;
 	end
 
 	// RMS COntrol Logic
 	// For ADC MSB first bit procesing,
-	//  If this is the start clear all accumulators
-	//  11: load into sign register
-	//  10-0: 2 cycles acc_n adc bit * srega --> acc, then adc bit * sregb, then >>> srega and sregb
+	//  Sstrb: If this is the start clear all accumulators on
+	//  bit11=0, --> sign = 0; bitt11=1 --> sign = 1 (subtract), adjust acc0-=srega, then acc1-=sregb
+	//  10-0: 2 cycles acc_n adc bit * sign * srega --> acc0, then adc bit ^ sign * sregb --< acc1, then >>> srega and sregb
     // For squaring 
 	// do CT RMS^s by acc0 = acc0^2+acc1^2
-	//  load acc0 into srega, b, and sign, and simultaneously clear acc0
+	//  sstrb: load acc0 into srega, b, and sign, and simultaneously init acc0 (!sign then 0, or if sign, acc0 <-- sregb)
     //  for 10-0 acc0 accumulate and srega <<, and sregb >>>, then next
 	//  load acc1 into srega, b, and sign
     //  for 10-0 acc0 accumulate and srega <<, and sregb >>>, then next
 	// do Ref RMS^s by acc2 = acc2^2+acc3^2
 	// give output strobe, RMS CT = acc0[23:0], RMS Reg = acc2[23:0]
+
+	// Keep track of ADC sample counts and classiffy each sample pair
+	// 0: is start (clear) and first saple of accumulaiton
+    // 1: is the normal accumulation
+    // 2: is RMS^2 calc of CT
+    // 3: is RMS^2 calc of Ref
+	localparam NUM_CYC = 250 * 1;
+	logic [11:0] sample_count;
+	logic [1:0] stype; // 0:clear, 1:acc, 2:rms CT, 3:rms Ref
+	always @(posedge clk) 
+		sample_count <= ( reset ) ? (NUM_CYC+2-1) : 
+						( !stick ) ? sample_count : 
+						( sample_count == (NUM_CYC+2-1) ) ? 0 : sample_count + 1;
+	assign stype = ( sample_count == 0 ) ? 0 :
+				  ( sample_count == NUM_CYC ) ? 2 :
+				  ( sample_count == NUM_CYC + 1) ? 3 : 1;
 	
-	// Detect first bit (MSB) from ADC
+	// Detect first bit (MSB) from ADC (for each channel in turn)
 	logic wait_1st, first_bit, rem_bit;
 	always_ff @(posedge clk) 
 		wait_1st <= ( reset ) ? 0 : ( sstrb ) ? 1 : ( sdval ) ? 0 : wait_1st;
 	assign first_bit = wait_1st & sdval;
 	assign rem_bit = sdval & !first_bit;
-
-	// Tie off for bring up
-	assign ld_sq = 0;
-	assign adc_src = 1;
-	assign shl_a = 0;
-	assign sclr = 0;
-	assign ld_trig = first_bit;
-	assign ld_sign = first_bit;
-
-	logic del_rem;
-	always_ff @(posedge clk) 
+	// and delayed rem bit to give 4 cycle op after sign known
+	logic del_rem, pre0, pre1;
+	always_ff @(posedge clk) begin
 		del_rem <= rem_bit;
+		pre0 <= first_bit;
+		pre1 <= pre0;
+	end
 
-	assign addr[1] = schan;
-	assign addr[0] = del_rem; // 0 then 1 -->  sin then cos
-	assign wr_acc = rem_bit | del_rem;
-	assign sel_a = rem_bit;
-	assign shr_a = rem_bit;
-	assign shr_b = del_rem;
+	// Clear all Accs for stype=0
+	always_comb begin
+		case( stype ) 
+			0 : begin // Initialize (zero) and ADC Accumulate
+					// pre0 - if sign, pre-acc srega to acc[0]=0
+					// pre1 - if sign, pre-acc sregb to acc[1]=1
+					// Const
+					shl_a = 0;
+					sclr = 0;
+					ld_sq = 0;
+					adc_src = 1;
+					sload = 0;
+					addr[1] = schan;
+					// Strobe, clear if stype == 0;
+					clr_acc = ( sstrb && !schan && stype == 0 ) ? 1'b1 : 1'b1; // init accs at start
+					// First Bit
+					ld_trig = first_bit;
+					ld_sign = first_bit;
+					// Bit timed
+					addr[0] = del_rem || pre1 ; // 0 then 1 -->  sin then cos
+					wr_acc = rem_bit | del_rem | ( sign & ( pre0 | pre1 ) );
+					sel_a = rem_bit | pre0;
+					shr_a = rem_bit | pre0;
+					shr_b = del_rem | pre1;
+				end
+			1 : begin // Normal ADC accumulate
+					// pre0 - if sign, pre-acc srega to acc[0]=0
+					// pre1 - if sign, pre-acc sregb to acc[1]=1
+					// Const
+					shl_a = 0;
+					sclr = 0;
+					ld_sq = 0;
+					adc_src = 1;
+					sload = 0;
+					addr[1] = schan;
+					clr_acc = 0;
+					// First Bit
+					ld_trig = first_bit;
+					ld_sign = first_bit;
+					// Bit timed
+					addr[0] = del_rem || pre1 ; // 0 then 1 -->  sin then cos
+					wr_acc = rem_bit | del_rem | ( sign & ( pre0 | pre1 ) );
+					sel_a = rem_bit | pre0;
+					shr_a = rem_bit | pre0;
+					shr_b = del_rem | pre1;
+				end
+			2 : begin // Chan 0 RMS, save acc0, and clr acc0 then acc0 += acc0^2 then acc0 +=  acc1^2,
+					// First - lo sregs, ld sign, if chan 0 then clr reg
+					// pre0 - if sign, pre-acc srega/b to acc[0]=0 andshl a, and shr b
+					// Const
+					addr[1] = 0;
+					sel_a = 0;
+					clr_acc = 0;
+					adc_src = 0;
+					ld_trig = 0;
+					shr_a = 0;
+					// First Bit
+					ld_sq = first_bit; // Load sregs from acc sum
+					ld_sign = first_bit;
+					addr[0] = schan & first_bit ; 
+					sclr = first_bit & !schan; // Clear acc0
+					// Bit Timed
+					sload = sign & pre0;
+					wr_acc = sclr | rem_bit | (sign & pre0);
+					shl_a = rem_bit | pre0 ;
+					shr_b = rem_bit | pre0 ;
+				end
+			3 : begin // chan 1 RMS same, but address the acc2, acc3 and RMS^2 = acc2
+					// Const
+					addr[1] = 1;
+					sel_a = 0;
+					clr_acc = 0;
+					adc_src = 0;
+					ld_trig = 0;
+					shr_a = 0;
+					// First Bit
+					ld_sq = first_bit; // Load sregs from acc sum
+					ld_sign = first_bit;
+					addr[0] = schan & first_bit ; 
+					sclr = first_bit & !schan; // Clear acc0
+					// Bit Timed
+					sload = sign & pre0;
+					wr_acc = sclr | rem_bit | (sign & pre0);
+					shl_a = rem_bit | pre0 ;
+					shr_b = rem_bit | pre0 ;
+				end
+		endcase
+	end
+
 
 
 	////////////////

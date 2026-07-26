@@ -28,6 +28,7 @@ module adc_spi_master
 	input  logic ad_miso,
 	
 	// ADC monitor outputs
+	output logic tick, // at very start of each 15kz sample cycle
 	output logic dout, // serial output
 	output logic chan, // Indicate chan 0 or 1
 	output logic dval, // Indicates valid bit 
@@ -48,16 +49,16 @@ module adc_spi_master
 	logic [5:0] div_half;
 	assign half_cyc = ( div_half == 39 ) ? 1'b1 : 1'b0;
 	always_ff @(posedge clk) 
-		div_half <= (reset)?0:(half_cyc == 39)?0:div_half+1;
+		div_half <= (reset)?0:(half_cyc)?0:div_half+1;
 
 	// Sample period counter
 	logic [6:0] count2x;
 	always_ff @(posedge clk)
-		count2x <= (reset)?0:(count2x== 79)?0:(half_cyc)?count2x+1:count2x;
+		count2x <= (reset)?0:(half_cyc && count2x== 79)?0:(half_cyc)?count2x+1:count2x;
 
 	// Waves for SPI samplign cycle
 	logic [0:39] ncs_wave, clk_wave, mosi_wave; 
-	logic [0:39] samp_wave, chan_wave, strb_wave; 
+	logic [0:39] samp_wave, chan_wave, strb_wave, tick_wave; 
 	initial begin
 		ncs_wave = 40'b1_0000_0_000000000000_1_0000_0_000000000000_1111;
 		clk_wave = 40'b0_1111_1_111111111111_0_1111_1_111111111111_0000;
@@ -65,15 +66,17 @@ module adc_spi_master
 		samp_wave= 40'b0_0000_0_111111111111_0_0000_0_111111111111_0000;	
 		chan_wave= 40'b1_0000_0_000000000000_0_1111_1_111111111111_1111;	
 		strb_wave= 40'b0_0010_0_000000000000_0_0010_0_000000000000_0000;	
+		tick_wave= 40'b0_1000_0_000000000000_0_0000_0_000000000000_0000;	
 	end
 	logic ncs_reg , clk_reg , mosi_reg ; 
-	logic samp_reg , chan_reg , strb_reg ; 
+	logic samp_reg , chan_reg , strb_reg, tick_reg ; 
 	always_ff @(posedge clk)  ncs_reg <=  ncs_wave[count2x[6:1]];
 	always_ff @(posedge clk)  clk_reg <=  clk_wave[count2x[6:1]] & count2x[0]; // gated clk
 	always_ff @(posedge clk) mosi_reg <= mosi_wave[count2x[6:1]];
 	always_ff @(posedge clk) samp_reg <= samp_wave[count2x[6:1]] & !count2x[0] & half_cyc; // sample pulse
 	always_ff @(posedge clk) chan_reg <= chan_wave[count2x[6:1]];
 	always_ff @(posedge clk) strb_reg <= strb_wave[count2x[6:1]] & !count2x[0] & half_cyc; // chan stobe
+	always_ff @(posedge clk) tick_reg <= tick_wave[count2x[6:1]] & !count2x[0] & half_cyc; // chan stobe
 
 	// Connect up ADC outputs (should have ext regs)
 	assign ad_ncs = ncs_reg;
@@ -93,6 +96,7 @@ module adc_spi_master
 	assign dval = samp_del;
 	assign chan = chan_reg;
 	assign strb = strb_reg;
+	assign tick = tick_reg;
 
 endmodule
 
