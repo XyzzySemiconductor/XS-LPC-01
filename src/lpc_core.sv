@@ -281,9 +281,9 @@ cos_rom[31] = 9'dx;
 	// Accumulators
 	always_ff @(posedge clk) begin
 		acc_ct_sin <= ( reset ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ct_sin;
-		acc_ct_cos <= ( reset ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ct_cos;
-		acc_ref_sin<= ( reset ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ref_sin;
-		acc_ref_cos<= ( reset ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ref_cos;
+		acc_ct_cos <= ( reset ) ? 0 : ( wr_acc && addr == 1 ) ? sum : acc_ct_cos;
+		acc_ref_sin<= ( reset ) ? 0 : ( wr_acc && addr == 2 ) ? sum : acc_ref_sin;
+		acc_ref_cos<= ( reset ) ? 0 : ( wr_acc && addr == 3 ) ? sum : acc_ref_cos;
 	end
 
 	// RMS COntrol Logic
@@ -299,6 +299,32 @@ cos_rom[31] = 9'dx;
     //  for 10-0 acc0 accumulate and srega <<, and sregb >>>, then next
 	// do Ref RMS^s by acc2 = acc2^2+acc3^2
 	// give output strobe, RMS CT = acc0[23:0], RMS Reg = acc2[23:0]
+	
+	// Detect first bit (MSB) from ADC
+	logic wait_1st, first_bit, rem_bit;
+	always_ff @(posedge clk) 
+		wait_1st <= ( reset ) ? 0 : ( sstrb ) ? 1 : ( sdval ) ? 0 : wait_1st;
+	assign first_bit = wait_1st & sdval;
+	assign rem_bit = sdval & !first_bit;
+
+	// Tie off for bring up
+	assign ld_sq = 0;
+	assign adc_src = 1;
+	assign shl_a = 0;
+	assign sclr = 0;
+	assign ld_trig = first_bit;
+	assign ld_sign = first_bit;
+
+	logic del_rem;
+	always_ff @(posedge clk) 
+		del_rem <= rem_bit;
+
+	assign addr[1] = schan;
+	assign addr[0] = del_rem; // 0 then 1 -->  sin then cos
+	assign wr_acc = rem_bit | del_rem;
+	assign sel_a = rem_bit;
+	assign shr_a = rem_bit;
+	assign shr_b = del_rem;
 
 
 	////////////////
