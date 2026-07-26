@@ -206,8 +206,100 @@ cos_rom[31] = 9'dx;
 	////////////////
     // RMS Compute
 	////////////////
+	
+	// input: sin, cos, sdata
+	// output: rms
+	// Core funtion is word serial multiply accumulate with 1 or 4 acc registers
 
-	// Serial MACC
+	// SregA: Multiplier (bit-serial operand) for squaring (SHFIT up), 
+    //    or  Multiplicand (Cos), for accumulation multiplyt (shift >>> each cyccle)
+	// SregB: Multiplicand (word operand, shifted >>> each cycle)
+	// sign: sign multipler from 1st bit from ADC or when SregA is loaded for multiply
+	// 0: acc_ct_sin[36]: Partial product accumulator for CT*sin
+	// 1: acc_ct_cos[36]: Partial product accumulator for CT*cos
+	// 2: acc_ref_sin[36]: Partial product accumulator for Ref*sin
+	// 3: acc_ref_cos[36]: Partial product accumulator for Ref*cos
+
+	// Regisers
+	logic [35:0] acc_ct_sin;
+	logic [35:0] acc_ct_cos;
+	logic [35:0] acc_ref_sin;
+	logic [35:0] acc_ref_cos;
+	logic sign;
+	logic [22:0] srega;
+	logic [22:0] sregb;
+
+	// data path Controls
+	logic ld_sq;  // Load the square to start (loads srega, sregb, sign)
+	logic [1:0] addr; // Current accumulator
+	logic ld_sign;	// On the first bit from adc load the sign (msb)
+	logic ld_trig;	// load srega = sin, sregb = cos
+	logic shr_a, shr_b, shl_a; // control shift on multplier arguments
+	logic adc_src; // select acd as input
+	logic sel_a; // select a (sin) as mutliplicand this cyclew, else b (cos)
+	logic sclr; // clear addressed acc this cycle (if wr_acc = 1)
+	logic wr_acc; // write acc this cycle
+
+	// Select multiplier bit
+	logic mult_bit;
+	assign mult_bit = ( adc_src ) ? sdata : srega[22];
+	
+	// Acc read mux:
+	wire [35:0] read_data;
+	assign read_data = ( addr == 0 ) ? acc_ct_sin :
+                       ( addr == 1 ) ? acc_ct_cos :
+                       ( addr == 2 ) ? acc_ref_sin :
+                       /*addr == 3*/   acc_ref_cos ;
+
+	// Sign register
+	always @(posedge clk) 
+		sign <= ( reset ) ? 0 :
+				( ld_sign ) ? mult_bit : sign;
+
+	// Srega/b
+	always @(posedge clk) 
+		sregb <= ( reset ) ? 0 :
+				 ( ld_sq ) ? { read_data[35-:12], 11'h000 } : 
+				 ( ld_trig ) ? { cos[11:0], 11'h000 } :
+				 ( shr_b  ) ? { sregb[22], sregb[22:1] } : // >>>
+							 sregb;
+	always @(posedge clk) 
+		srega <= ( reset ) ? 0 :
+				 ( ld_sq ) ? { read_data[35-:12], 11'h000 } : 
+				 ( ld_trig)? { sin[11:0], 11'h000 } :
+				 ( shr_a ) ? { srega[22], srega[22:1] } : // >>>
+				 ( shl_a ) ? { srega[21:0], 1'b0 } : // <<<
+							   srega;
+
+	// word addition
+	logic signed [35:0] suma, sumb, sum;
+	assign suma = read_data;
+	assign sumb = ( !mult_bit ) ? 0 : ( sel_a ) ? srega : sregb;
+	assign sum  = ( sclr ) ? 0 : 
+                  ( sign ) ? suma - sumb : suma + sumb;
+	
+	// Accumulators
+	always_ff @(posedge clk) begin
+		acc_ct_sin <= ( reset ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ct_sin;
+		acc_ct_cos <= ( reset ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ct_cos;
+		acc_ref_sin<= ( reset ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ref_sin;
+		acc_ref_cos<= ( reset ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ref_cos;
+	end
+
+	// RMS COntrol Logic
+	// For ADC MSB first bit procesing,
+	//  If this is the start clear all accumulators
+	//  11: load into sign register
+	//  10-0: 2 cycles acc_n adc bit * srega --> acc, then adc bit * sregb, then >>> srega and sregb
+    // For squaring 
+	// do CT RMS^s by acc0 = acc0^2+acc1^2
+	//  load acc0 into srega, b, and sign, and simultaneously clear acc0
+    //  for 10-0 acc0 accumulate and srega <<, and sregb >>>, then next
+	//  load acc1 into srega, b, and sign
+    //  for 10-0 acc0 accumulate and srega <<, and sregb >>>, then next
+	// do Ref RMS^s by acc2 = acc2^2+acc3^2
+	// give output strobe, RMS CT = acc0[23:0], RMS Reg = acc2[23:0]
+
 
 	////////////////
     // LPC Control
