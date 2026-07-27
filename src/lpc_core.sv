@@ -76,12 +76,32 @@ module lpc_core (
 	
 	// TODO tighten this down
 
-    logic [15:0] angle;
-    logic [15:0] sin_out, cos_out;
-    logic valid, busy, strobe;
+	// Strobe to advance 3200 cycles
+	logic strobe;
+	logic [11:0] strb_cnt;
+	always @(posedge clk) begin
+		strb_cnt <= ( reset || strb_cnt == 3199 ) ? 0 : strb_cnt + 1;
+		strobe   <= ( strb_cnt == 3199 ) ? 1'b1 : 1'b0;
+	end
 
-`define USE_CORDIC
-`ifdef USE_CORDIC
+    // Count angle every start pulse (-12500 to 12300 step by 200 then back to -12500, 250 steps per cycle
+    logic [15:0] angle;
+    reg polarity;
+    always @(posedge clk) begin
+        if( reset ) begin
+            angle <= -12500;
+            polarity <= 1;
+        end else begin
+            if( strobe ) begin
+                angle <= ( angle == 12300 ) ? -12500 : angle + 200;
+                polarity <= ( angle == 12300 ) ? ~polarity : polarity;
+            end
+        end
+    end
+
+	// Coridc core
+    logic [15:0] sin_out, cos_out;
+    logic valid, busy;
     cordic_sincos_50000_core_20 i_cordic(
         .clk( clk ),
         .rst( reset ),
@@ -92,116 +112,21 @@ module lpc_core (
         .valid( valid ),
         .busy( busy )
     );
-`endif
-	// Strobe to advance 
-	logic [11:0] strb_cnt;
-	always @(posedge clk) begin
-		strb_cnt <= ( reset || strb_cnt == 3199 ) ? 0 : strb_cnt + 1;
-		strobe   <= ( strb_cnt == 3199 ) ? 1'b1 : 1'b0;
-	end
 
-    // Count angle every start pulse (-25000 to 24999 )
-    // at 3Mhz (48Mhz/16) this gives us exactly 60 Hz grid freq
-	// with an advance of strobe of 3200 cycles, and advance of 200 gives 60Hz
-	// TODO make sure to reduce this logic
+   // Corect polarity
+    wire [15:0] cos_pol, sin_pol;
+    assign cos_pol = ( polarity ) ? ~cos_out : cos_out;
+    assign sin_pol = ( polarity ) ? ~sin_out : sin_out;
+    // scale 3/8 so peaks at +/-1544, about 75% full scale
+    wire [11:0] cos3x, sin3x;
+    assign cos3x = cos_pol[15-:12] + { cos_pol[15], cos_pol[15-:11] };
+    assign sin3x = sin_pol[15-:12] + { sin_pol[15], sin_pol[15-:11] };
 
-    reg polarity;
-    reg pdir;
-    always @(posedge clk) begin
-        if( reset ) begin
-            angle <= 12500;
-            polarity <= 0;
-            pdir <= 0;
-        end else begin
-            if( strobe ) begin
-                angle <= angle + (( pdir ) ? 200 : -200);
-                polarity <= ( angle == 12499 && pdir == 1 ) ? ~polarity : polarity;
-                pdir <= ( pdir == 0 && angle == 1 ) ? 1 : ( pdir == 1 && angle == 12499 ) ? 0 : pdir;
-            end
-        end
-    end
-   // Multiply cos by 3: to nicely fill dynamic range
-    wire signed [11:0] cos3x;
-    wire signed [11:0] sin3x;
-
-`ifdef USE_CORDIC
-    assign cos3x = cos_out[15-:12] + ( cos_out[15-:12] >>> 1 );
-    assign sin3x = sin_out[15-:12] + ( sin_out[15-:12] >>> 1 );
-`endif
-
-//`define MAKE_ROM
-`ifdef MAKE_ROM
-    /////////////////////
-    // Build a rom
-    reg [8:0] cos_rom[31:0];
-    initial for( int ii = 0; ii < 32; ii++ )
-        cos_rom[ii] <= 12'sd0;
-    reg [15:0] prev_angle;
-    always @(posedge clk) begin
-        prev_angle <= angle;
-        if( strobe && !angle[15] )
-            if( prev_angle[8:0] == (1<<8) )  cos_rom[prev_angle[13-:5]] <= cos3x[10:2];
-    end
-    always @(posedge clk) begin
-        if( strobe && angle == 100 && pdir == 1 && polarity == 0 )
-            for( int ii = 0; ii < 32; ii++ )
-            $display("cos_rom[%0d] = 9'd%0d;", ii, cos_rom[ii] );
-    end
-    ///////////////////
-`endif
-
-`ifndef USE_CORDIC // if not cordic, then ROM
-    reg [8:0] cos_rom [31:0];
-    initial begin
-cos_rom[0] = 9'd385;
-cos_rom[1] = 9'd384;
-cos_rom[2] = 9'd380;
-cos_rom[3] = 9'd375;
-cos_rom[4] = 9'd369;
-cos_rom[5] = 9'd361;
-cos_rom[6] = 9'd352;
-cos_rom[7] = 9'd341;
-cos_rom[8] = 9'd329;
-cos_rom[9] = 9'd315;
-cos_rom[10] = 9'd300;
-cos_rom[11] = 9'd284;
-cos_rom[12] = 9'd267;
-cos_rom[13] = 9'd249;
-cos_rom[14] = 9'd229;
-cos_rom[15] = 9'd209;
-cos_rom[16] = 9'd187;
-cos_rom[17] = 9'd166;
-cos_rom[18] = 9'd143;
-cos_rom[19] = 9'd119;
-cos_rom[20] = 9'd96;
-cos_rom[21] = 9'd72;
-cos_rom[22] = 9'd47;
-cos_rom[23] = 9'd22;
-cos_rom[24] = 9'd0;
-cos_rom[25] = 9'dx;
-cos_rom[26] = 9'dx;
-cos_rom[27] = 9'dx;
-cos_rom[28] = 9'dx;
-cos_rom[29] = 9'dx;
-cos_rom[30] = 9'dx;
-cos_rom[31] = 9'dx;
-    end
-    assign valid = 1;
-    wire [8:0] read;
-    assign read = cos_rom[angle[13-:5]];
-    assign cos3x = { 1'b0, read, 2'b00 };
-`endif // ROM not CORDIC
-
-    // Correct Polarity (just negate)
+	// register sin/cos
     reg signed [11:0] sin, cos;
     always @(posedge clk) begin
-        if( reset ) begin
-            sin<= 0;
-            cos<= 0;
-        end else if( valid ) begin
-            sin   <= ( polarity ) ? ~sin3x : sin3x; // use cos as it aligns with polarity
-            cos   <= ( polarity ) ? ~cos3x : cos3x; // use cos as it aligns with polarity
-        end
+		sin <= ( reset ) ? 0 : sin3x;
+		cos <= ( reset ) ? 0 : cos3x;
     end
 
 	////////////////
@@ -349,15 +274,15 @@ cos_rom[31] = 9'dx;
 					sclr = 0;
 					ld_sq = 0;
 					adc_src = 1;
-					sload = 0;
+					sload = sign & ( pre0 | pre1 );
 					addr[1] = schan;
 					// Strobe, clear if stype == 0;
-					clr_acc = ( sstrb && !schan && stype == 0 ) ? 1'b1 : 1'b1; // init accs at start
+					clr_acc = ( sstrb && !schan && stype == 0 ) ? 1'b1 : 1'b0; // init accs at start
 					// First Bit
 					ld_trig = first_bit;
 					ld_sign = first_bit;
 					// Bit timed
-					addr[0] = del_rem || pre1 ; // 0 then 1 -->  sin then cos
+					addr[0] = del_rem | pre1 ; // 0 then 1 -->  sin then cos
 					wr_acc = rem_bit | del_rem | ( sign & ( pre0 | pre1 ) );
 					sel_a = rem_bit | pre0;
 					shr_a = rem_bit | pre0;
@@ -371,14 +296,14 @@ cos_rom[31] = 9'dx;
 					sclr = 0;
 					ld_sq = 0;
 					adc_src = 1;
-					sload = 0;
+					sload = sign & ( pre0 | pre1 );
 					addr[1] = schan;
 					clr_acc = 0;
 					// First Bit
 					ld_trig = first_bit;
 					ld_sign = first_bit;
 					// Bit timed
-					addr[0] = del_rem || pre1 ; // 0 then 1 -->  sin then cos
+					addr[0] = del_rem | pre1 ; // 0 then 1 -->  sin then cos
 					wr_acc = rem_bit | del_rem | ( sign & ( pre0 | pre1 ) );
 					sel_a = rem_bit | pre0;
 					shr_a = rem_bit | pre0;
@@ -427,7 +352,20 @@ cos_rom[31] = 9'dx;
 		endcase
 	end
 
+	// Strobe out calculated RMS
+	logic rms_valid;
+	logic [23:0] rms_ct, rms_ref;
+	assign rms_ct  = acc_ct_sin[23:0];
+	assign rms_ref = acc_ref_sin[23:0];
+	assign rms_valid = ( stick && stype == 3 ) ? 1'b1 :1'b0;
 
+
+	// Temp Registers
+	logic [23:0] rms_hold_ct, rms_hold_ref;
+	always_ff @(posedge clk) begin
+		rms_hold_ct <= ( reset ) ? 0 : ( rms_valid ) ? rms_ct  : rms_hold_ct;
+		rms_hold_ref<= ( reset ) ? 0 : ( rms_valid ) ? rms_ref : rms_hold_ref;
+	end
 
 	////////////////
     // LPC Control
