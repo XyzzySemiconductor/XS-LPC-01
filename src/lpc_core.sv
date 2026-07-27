@@ -28,7 +28,7 @@ module lpc_core (
 	reg [15:0] xstate;
 	always_ff @(posedge clk) 
 		xstate <= ( reset ) ? 0 : xstate + &{ clk, reset, button, period_sw, timeout_sw, setup_sw, adc_miso };
-	assign { time_led, fault_led, run_led, pump_out } = xstate;
+	//assign { time_led, fault_led, run_led, pump_out } = xstate;
     
 	////////////////
     // ADC inteface
@@ -148,14 +148,14 @@ module lpc_core (
 	// 2: acc_ref_sin[36]: Partial product accumulator for Ref*sin
 	// 3: acc_ref_cos[36]: Partial product accumulator for Ref*cos
 
-	// Regisers
-	logic [35:0] acc_ct_sin;
-	logic [35:0] acc_ct_cos;
-	logic [35:0] acc_ref_sin;
-	logic [35:0] acc_ref_cos;
+	// RMS Arch Data Registers
+	logic [22:0] acc_sin;
+	logic [22:0] acc_cos;
+	logic [63:0] acc_ct_rms;
+	logic [63:0] acc_ref_rms;
 	logic sign;
-	logic [22:0] srega;
-	logic [22:0] sregb;
+	logic [46:0] srega;
+	logic [46:0] sregb;
 
 	// data path Controls
 	logic ld_sq;  // Load the square to start (loads srega, sregb, sign)
@@ -172,53 +172,53 @@ module lpc_core (
 
 	// Select multiplier bit
 	logic mult_bit;
-	assign mult_bit = ( adc_src ) ? sdata : srega[22];
+	assign mult_bit = ( adc_src ) ? sdata : srega[46];
 	
 	// Acc read mux:
-	wire [35:0] read_data;
-	assign read_data = ( addr == 0 ) ? acc_ct_sin :
-                       ( addr == 1 ) ? acc_ct_cos :
-                       ( addr == 2 ) ? acc_ref_sin :
-                       /*addr == 3*/   acc_ref_cos ;
+	wire [63:0] read_data;
+	assign read_data = ( addr == 0 ) ? { {41{acc_sin[22]}}, acc_sin } :
+                       ( addr == 1 ) ? { {40{acc_cos[22]}}, acc_cos } :
+                       ( addr == 2 ) ? acc_ct_rms :
+                       /*addr == 3*/   acc_ref_rms ;
 
 	// Sign register
 	always @(posedge clk) 
 		sign <= ( reset ) ? 0 :
 				( ld_sign && adc_src ) ? sdata: 
-				( ld_sign ) ? read_data[31] : sign;
+				( ld_sign ) ? read_data[63] : sign;
 
 	// Srega/b
 	always @(posedge clk) 
-		sregb <= ( reset ) ? 0 :
-				 ( ld_sq ) ? { read_data[31-:12], 11'h000 } : 
-				 ( ld_trig ) ? { cos[11:0], 11'h000 } :
-				 ( shr_b  ) ? { sregb[22], sregb[22:1] } : // >>>
-							 sregb;
+		sregb <= ( reset  ) ? 0 :
+				 ( ld_sq  ) ? { read_data[23-:24], 23'b0 } : 
+				 ( ld_trig) ? { cos[11:0], 35'b0 } :
+				 ( shr_b  ) ? { sregb[46], sregb[46:1] } : // >>>
+							    sregb;
 	always @(posedge clk) 
 		srega <= ( reset ) ? 0 :
-				 ( ld_sq ) ? { read_data[31-:12], 11'h000 } : 
-				 ( ld_trig)? { sin[11:0], 11'h000 } :
-				 ( shr_a ) ? { srega[22], srega[22:1] } : // >>>
-				 ( shl_a ) ? { srega[21:0], 1'b0 } : // <<<
+				 ( ld_sq ) ? { read_data[23-:24], 23'b0 } : 
+				 ( ld_trig)? { sin[11:0], 35'h000 } :
+				 ( shr_a ) ? { srega[46], srega[46:1] } : // >>>
+				 ( shl_a ) ? { srega[45:0], 1'b0 } : // <<<
 							   srega;
 
 	// word addition
-	logic [22:0] src;
+	logic [46:0] src;
 	assign src = ( sel_a ) ? srega : sregb;
-	logic signed [35:0] suma, sumb, sum;
+	logic signed [63:0] suma, sumb, sum;
 	assign suma = read_data;
-	assign sumb = ( sload ) ? { {24{src[22]}},src[22-:12] } :
-                  ( !(mult_bit^sign) ) ? 0 : { {13{src[22]}}, src };
+	assign sumb = ( sload ) ? { {17{src[46]}},src } :
+                  ( !(mult_bit^sign) ) ? 0 : { {17{src[46]}}, src };
 	assign sum  = 
 				  ( sclr & !sload ) ? 0 : 
                   ( sign ) ? suma - sumb : suma + sumb;
 	
 	// Accumulators
 	always_ff @(posedge clk) begin
-		acc_ct_sin <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ct_sin;
-		acc_ct_cos <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 1 ) ? sum : acc_ct_cos;
-		acc_ref_sin<= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 2 ) ? sum : acc_ref_sin;
-		acc_ref_cos<= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 3 ) ? sum : acc_ref_cos;
+		acc_sin <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_sin;
+		acc_cos <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 1 ) ? sum : acc_cos;
+		acc_ct_rms <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 2 ) ? sum : acc_ct_rms;
+		acc_ref_rms<= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 3 ) ? sum : acc_ref_rms;
 	end
 
 	// RMS COntrol Logic
@@ -356,17 +356,13 @@ module lpc_core (
 
 	// Strobe out calculated RMS
 	logic rms_valid;
-	logic [23:0] rms_ct, rms_ref;
-	assign rms_ct  = acc_ct_sin[23:0];
-	assign rms_ref = acc_ref_sin[23:0];
 	assign rms_valid = ( stick && stype == 3 ) ? 1'b1 :1'b0;
 
-
 	// Temp Registers
-	logic [23:0] rms_hold_ct, rms_hold_ref;
+	logic [63:0] rms_hold_ct, rms_hold_ref;
 	always_ff @(posedge clk) begin
-		rms_hold_ct <= ( reset ) ? 0 : ( rms_valid ) ? rms_ct  : rms_hold_ct;
-		rms_hold_ref<= ( reset ) ? 0 : ( rms_valid ) ? rms_ref : rms_hold_ref;
+		rms_hold_ct <= ( reset ) ? 0 : ( rms_valid ) ? acc_ct_rms  : rms_hold_ct;
+		rms_hold_ref<= ( reset ) ? 0 : ( rms_valid ) ? acc_ref_rms : rms_hold_ref;
 	end
 
 	////////////////
@@ -387,6 +383,8 @@ module lpc_core (
 
 	// Setup Mode
 
+	assign { run_led, pump_out  } = rms_hold_ct[63-:2];
+	assign { time_led, fault_led} = rms_hold_ref[63-:2];
 	
 endmodule
 
