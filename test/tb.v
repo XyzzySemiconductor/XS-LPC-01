@@ -104,8 +104,8 @@ module tb ();
 
 	// Corect polarity
    	wire [15:0] cos_pol, sin_pol;
-    assign cos_pol = ( polarity ) ? ~cos_out : cos_out;
-    assign sin_pol = ( polarity ) ? ~sin_out : sin_out;
+    assign cos_pol = ( polarity ) ? -cos_out : cos_out;
+    assign sin_pol = ( polarity ) ? -sin_out : sin_out;
 	// scale 3/8 so peaks at +/-1544, about 75% full scale
     wire [11:0] cos3x, sin3x;
     assign cos3x = cos_pol[15-:12] + { cos_pol[15], cos_pol[15-:11] };
