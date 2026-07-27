@@ -71,100 +71,27 @@ module lpc_core (
 	forge_debounce #(48) i_bounc(.clk(clk),.reset(reset),.in(button),.out(button_debounce),.long(long_button));
 
 	////////////////
-    // 60Hz Coric 
-	////////////////
-	
-	// TODO tighten this down
-
-	// Strobe to advance 3200 cycles
-	logic strobe;
-	logic [11:0] strb_cnt;
-	always @(posedge clk) begin
-		strb_cnt <= ( reset || strb_cnt == 3199 ) ? 0 : strb_cnt + 1;
-		strobe   <= ( strb_cnt == 3199 ) ? 1'b1 : 1'b0;
-	end
-
-    // Count angle every start pulse (-12500 to 12300 step by 200 then back to -12500, 250 steps per cycle
-    logic [15:0] angle;
-    reg polarity, polarity2;
-    always @(posedge clk) begin
-        if( reset ) begin
-            angle <= -12500;
-            polarity <= 1;
-            polarity2 <= 1;
-        end else begin
-            if( strobe ) begin
-                angle <= ( angle == 12300 ) ? -12500 : angle + 200;
-                polarity <= ( angle == 12300 ) ? ~polarity : polarity;
-				polarity2 <= polarity;
-            end
-        end
-    end
-
-	// Coridc core
-    logic [15:0] sin_out, cos_out;
-    logic valid, busy;
-    cordic_sincos_50000_core_20 i_cordic(
-        .clk( clk ),
-        .rst( reset ),
-        .start( strobe ),
-        .angle_in( angle ),
-        .sin_out ( sin_out ),
-        .cos_out ( cos_out ),
-        .valid( valid ),
-        .busy( busy )
-    );
-
-   // Corect polarity
-    wire [15:0] cos_pol, sin_pol;
-    assign cos_pol = ( polarity2 ) ? -cos_out : cos_out;
-    assign sin_pol = ( polarity2 ) ? -sin_out : sin_out;
-    // scale 3/8 so peaks at +/-1544, about 75% full scale
-    wire [11:0] cos3x, sin3x;
-    assign cos3x = cos_pol[15-:12] + { cos_pol[15], cos_pol[15-:11] };
-    assign sin3x = sin_pol[15-:12] + { sin_pol[15], sin_pol[15-:11] };
-
-	// register sin/cos
-    reg signed [11:0] sin, cos;
-    always @(posedge clk) begin
-		sin <= ( reset ) ? 0 : sin3x;
-		cos <= ( reset ) ? 0 : cos3x;
-    end
-
-	////////////////
     // RMS Compute
 	////////////////
 	
-	// input: sin, cos, sdata
-	// output: rms
-	// Core funtion is word serial multiply accumulate with 1 or 4 acc registers
-
-	// SregA: Multiplier (bit-serial operand) for squaring (SHFIT up), 
-    //    or  Multiplicand (Cos), for accumulation multiplyt (shift >>> each cyccle)
-	// SregB: Multiplicand (word operand, shifted >>> each cycle)
-	// sign: sign multipler from 1st bit from ADC or when SregA is loaded for multiply
-	// 0: acc_ct_sin[36]: Partial product accumulator for CT*sin
-	// 1: acc_ct_cos[36]: Partial product accumulator for CT*cos
-	// 2: acc_ref_sin[36]: Partial product accumulator for Ref*sin
-	// 3: acc_ref_cos[36]: Partial product accumulator for Ref*cos
+	// SregA[12]: Multiplier (bit-serial operand) for squaring (SHFIT up), SD, shift in adc msb first
+	// SregB[24]: Multiplicand (word operand, shifted >>> each cycle), shift in adc msb first
+	// sign: sign multipler bit from ADC first bit
+	// 0: acc_ct[36]: Partial product accumulator for CT*sin
+	// 1: acc_ref[36]: Partial product accumulator for CT*cos
 
 	// RMS Arch Data Registers
-	logic [22:0] acc_sin;
-	logic [22:0] acc_cos;
-	logic [63:0] acc_ct_rms;
-	logic [63:0] acc_ref_rms;
+	logic [35:0] acc_ct;
+	logic [35:0] acc_ref;
 	logic sign;
-	logic [46:0] srega;
-	logic [46:0] sregb;
+	logic [22:0] srega;
+	logic [22:0] sregb;
 
 	// data path Controls
 	logic ld_sq;  // Load the square to start (loads srega, sregb, sign)
-	logic [1:0] addr; // Current accumulator
+	logic addr; // Current accumulator
 	logic ld_sign;	// On the first bit from adc load the sign (msb)
-	logic ld_trig;	// load srega = sin, sregb = cos
 	logic shr_a, shr_b, shl_a; // control shift on multplier arguments
-	logic adc_src; // select acd as input
-	logic sel_a; // select a (sin) as mutliplicand this cyclew, else b (cos)
 	logic sclr; // clear addressed acc this cycle (if wr_acc = 1)
 	logic sload; // clear addressed acc this cycle (if wr_acc = 1)
 	logic clr_acc; // clear the accumulators
@@ -172,53 +99,45 @@ module lpc_core (
 
 	// Select multiplier bit
 	logic mult_bit;
-	assign mult_bit = ( adc_src ) ? sdata : srega[46];
+	assign mult_bit = srega[22];
 	
 	// Acc read mux:
-	wire [63:0] read_data;
-	assign read_data = ( addr == 0 ) ? { {41{acc_sin[22]}}, acc_sin } :
-                       ( addr == 1 ) ? { {40{acc_cos[22]}}, acc_cos } :
-                       ( addr == 2 ) ? acc_ct_rms :
-                       /*addr == 3*/   acc_ref_rms ;
+	wire [35:0] read_data;
+	assign read_data = ( addr == 0 ) ? acc_ct :
+                       /*addr == 1*/   acc_ref ;
 
 	// Sign register
 	always @(posedge clk) 
 		sign <= ( reset ) ? 0 :
-				( ld_sign && adc_src ) ? sdata: 
-				( ld_sign ) ? read_data[63] : sign;
+				( ld_sign ) ? sdata : sign;
 
 	// Srega/b
 	always @(posedge clk) 
 		sregb <= ( reset  ) ? 0 :
-				 ( ld_sq  ) ? { read_data[23-:24], 23'b0 } : 
-				 ( ld_trig) ? { cos[11:0], 35'b0 } :
-				 ( shr_b  ) ? { sregb[46], sregb[46:1] } : // >>>
+				 ( ld_sq  ) ? { sregb[21-:10], sdata, 12'b0 } : 
+				 ( shr_b  ) ? { sregb[22], sregb[22:1] } : // >>>
 							    sregb;
 	always @(posedge clk) 
 		srega <= ( reset ) ? 0 :
-				 ( ld_sq ) ? { read_data[23-:24], 23'b0 } : 
-				 ( ld_trig)? { sin[11:0], 35'h000 } :
-				 ( shr_a ) ? { srega[46], srega[46:1] } : // >>>
-				 ( shl_a ) ? { srega[45:0], 1'b0 } : // <<<
+				 ( ld_sq ) ? { srega[21-:10], sdata, 12'b0 } : 
+				 ( shr_a ) ? { srega[22], srega[22:1] } : // >>>
+				 ( shl_a ) ? { srega[21:0], 1'b0 } : // <<<
 							   srega;
 
 	// word addition
-	logic [46:0] src;
-	assign src = ( sel_a ) ? srega : sregb;
 	logic signed [63:0] suma, sumb, sum;
 	assign suma = read_data;
-	assign sumb = ( sload ) ? { {17{src[46]}},src } :
-                  ( !(mult_bit^sign) ) ? 0 : { {17{src[46]}}, src };
+	assign sumb = ( sload ) ? { {13{sregb[22]}},sregb } :
+				  ( sclr  ) ? 0 :  // need this for the prelaod case?
+                  ( !(mult_bit^sign) ) ? 0 : { {13{sregb[22]}}, sregb};
 	assign sum  = 
 				  ( sclr & !sload ) ? 0 : 
                   ( sign ) ? suma - sumb : suma + sumb;
 	
 	// Accumulators
 	always_ff @(posedge clk) begin
-		acc_sin <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_sin;
-		acc_cos <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 1 ) ? sum : acc_cos;
-		acc_ct_rms <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 2 ) ? sum : acc_ct_rms;
-		acc_ref_rms<= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 3 ) ? sum : acc_ref_rms;
+		acc_ct <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ct;
+		acc_ref <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 1 ) ? sum : acc_ref;
 	end
 
 	// RMS COntrol Logic
@@ -275,18 +194,14 @@ module lpc_core (
 					shl_a = 0;
 					sclr = 0;
 					ld_sq = 0;
-					adc_src = 1;
 					sload = sign & ( pre0 | pre1 );
-					addr[1] = schan;
 					// Strobe, clear if stype == 0;
 					clr_acc = ( sstrb && !schan && stype == 0 ) ? 1'b1 : 1'b0; // init accs at start
 					// First Bit
-					ld_trig = first_bit;
 					ld_sign = first_bit;
 					// Bit timed
-					addr[0] = del_rem | pre1 ; // 0 then 1 -->  sin then cos
+					addr = del_rem | pre1 ; // 0 then 1 -->  sin then cos
 					wr_acc = rem_bit | del_rem | ( sign & ( pre0 | pre1 ) );
-					sel_a = rem_bit | pre0;
 					shr_a = rem_bit | pre0;
 					shr_b = del_rem | pre1;
 				end
@@ -297,17 +212,13 @@ module lpc_core (
 					shl_a = 0;
 					sclr = 0;
 					ld_sq = 0;
-					adc_src = 1;
 					sload = sign & ( pre0 | pre1 );
-					addr[1] = schan;
 					clr_acc = 0;
 					// First Bit
-					ld_trig = first_bit;
 					ld_sign = first_bit;
 					// Bit timed
-					addr[0] = del_rem | pre1 ; // 0 then 1 -->  sin then cos
+					addr = del_rem | pre1 ; // 0 then 1 -->  sin then cos
 					wr_acc = rem_bit | del_rem | ( sign & ( pre0 | pre1 ) );
-					sel_a = rem_bit | pre0;
 					shr_a = rem_bit | pre0;
 					shr_b = del_rem | pre1;
 				end
@@ -315,16 +226,12 @@ module lpc_core (
 					// First - lo sregs, ld sign, if chan 0 then clr reg
 					// pre0 - if sign, pre-acc srega/b to acc[0]=0 andshl a, and shr b
 					// Const
-					addr[1] = 0;
-					sel_a = 0;
 					clr_acc = 0;
-					adc_src = 0;
-					ld_trig = 0;
 					shr_a = 0;
 					// First Bit
 					ld_sq = first_bit; // Load sregs from acc sum
 					ld_sign = first_bit;
-					addr[0] = schan & first_bit ; 
+					addr = schan & first_bit ; 
 					sclr = first_bit & !schan; // Clear acc0
 					// Bit Timed
 					sload = sign & pre0;
@@ -334,16 +241,12 @@ module lpc_core (
 				end
 			3 : begin // chan 1 RMS same, but address the acc2, acc3 and RMS^2 = acc2
 					// Const
-					addr[1] = 1;
-					sel_a = 0;
 					clr_acc = 0;
-					adc_src = 0;
-					ld_trig = 0;
 					shr_a = 0;
 					// First Bit
 					ld_sq = first_bit; // Load sregs from acc sum
 					ld_sign = first_bit;
-					addr[0] = schan & first_bit ; 
+					addr = schan & first_bit ; 
 					sclr = first_bit & !schan; // Clear acc0
 					// Bit Timed
 					sload = sign & pre0;
@@ -359,10 +262,10 @@ module lpc_core (
 	assign rms_valid = ( stick && stype == 3 ) ? 1'b1 :1'b0;
 
 	// Temp Registers
-	logic [63:0] rms_hold_ct, rms_hold_ref;
+	logic [35:0] rms_hold_ct, rms_hold_ref;
 	always_ff @(posedge clk) begin
-		rms_hold_ct <= ( reset ) ? 0 : ( rms_valid ) ? acc_ct_rms  : rms_hold_ct;
-		rms_hold_ref<= ( reset ) ? 0 : ( rms_valid ) ? acc_ref_rms : rms_hold_ref;
+		rms_hold_ct <= ( reset ) ? 0 : ( rms_valid ) ? acc_ct  : rms_hold_ct;
+		rms_hold_ref<= ( reset ) ? 0 : ( rms_valid ) ? acc_ref : rms_hold_ref;
 	end
 
 	////////////////
@@ -383,8 +286,8 @@ module lpc_core (
 
 	// Setup Mode
 
-	assign { run_led, pump_out  } = rms_hold_ct[63-:2];
-	assign { time_led, fault_led} = rms_hold_ref[63-:2];
+	assign { run_led, pump_out  } = rms_hold_ct[35-:2];
+	assign { time_led, fault_led} = rms_hold_ref[35-:2];
 	
 endmodule
 
