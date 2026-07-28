@@ -22,7 +22,8 @@ module lpc_core (
 	 input logic adc_miso 	// shift data output from adc
 );
    	// Physical parameters
-
+	parameter NUM_SAMPLE = 250 * 1; // samples to accumulate mult of 250 per 60hz cycle
+	parameter MAX_RMS 	 = 1544; 	// max RMS current
 
 	// TT tie-off (to be removed)
 	reg [15:0] xstate;
@@ -81,30 +82,20 @@ module lpc_core (
 	// 1: acc_ref[36]: Partial product accumulator for CT*cos
 
 	// RMS Arch Data Registers
-	logic [35:0] acc_ct;
-	logic [35:0] acc_ref;
+	logic signed [35:0] acc_ct;
+	logic signed [35:0] acc_ref;
 	logic sign;
-	logic [22:0] srega;
-	logic [22:0] sregb;
+	logic signed [22:0] srega;
+	logic signed [22:0] sregb;
 
 	// data path Controls
-	logic ld_sq;  // Load the square to start (loads srega, sregb, sign)
-	logic addr; // Current accumulator
+	logic ld_sq;  	// shifts in teh ADC into srega and b
 	logic ld_sign;	// On the first bit from adc load the sign (msb)
+	logic addr; 	// Acc accumulator address
 	logic shr_a, shr_b, shl_a; // control shift on multplier arguments
-	logic sclr; // clear addressed acc this cycle (if wr_acc = 1)
-	logic sload; // clear addressed acc this cycle (if wr_acc = 1)
-	logic clr_acc; // clear the accumulators
-	logic wr_acc; // write acc this cycle
-
-	// Select multiplier bit
-	logic mult_bit;
-	assign mult_bit = srega[22];
-	
-	// Acc read mux:
-	wire [35:0] read_data;
-	assign read_data = ( addr == 0 ) ? acc_ct :
-                       /*addr == 1*/   acc_ref ;
+	logic sload; 	// forced add
+	logic clr_acc;  // clear all accumulators
+	logic wr_acc; 	// write acc this cycle
 
 	// Sign register
 	always @(posedge clk) 
@@ -126,13 +117,10 @@ module lpc_core (
 
 	// word addition
 	logic signed [63:0] suma, sumb, sum;
-	assign suma = read_data;
-	assign sumb = ( sload ) ? { {13{sregb[22]}},sregb } :
-				  ( sclr  ) ? 0 :  // need this for the prelaod case?
-                  ( !(mult_bit^sign) ) ? 0 : { {13{sregb[22]}}, sregb};
-	assign sum  = 
-				  ( sclr & !sload ) ? 0 : 
-                  ( sign ) ? suma - sumb : suma + sumb;
+	assign suma = ( addr == 0 ) ? acc_ct : acc_ref;
+	assign sumb = ( sload ) ? { {24{sregb[22]}},sregb[22-:12] } :
+                  ( !(srega[22]^sign) ) ? 0 : { {13{sregb[22]}}, sregb};
+	assign sum  = ( sign ) ? suma - sumb : suma + sumb;
 	
 	// Accumulators
 	always_ff @(posedge clk) begin
@@ -141,34 +129,28 @@ module lpc_core (
 	end
 
 	// RMS COntrol Logic
-	// For ADC MSB first bit procesing,
-	//  Sstrb: If this is the start clear all accumulators on
-	//  bit11=0, --> sign = 0; bitt11=1 --> sign = 1 (subtract), adjust acc0-=srega, then acc1-=sregb
-	//  10-0: 2 cycles acc_n adc bit * sign * srega --> acc0, then adc bit ^ sign * sregb --< acc1, then >>> srega and sregb
-    // For squaring 
-	// do CT RMS^s by acc0 = acc0^2+acc1^2
-	//  sstrb: load acc0 into srega, b, and sign, and simultaneously init acc0 (!sign then 0, or if sign, acc0 <-- sregb)
-    //  for 10-0 acc0 accumulate and srega <<, and sregb >>>, then next
-	//  load acc1 into srega, b, and sign
-    //  for 10-0 acc0 accumulate and srega <<, and sregb >>>, then next
-	// do Ref RMS^s by acc2 = acc2^2+acc3^2
-	// give output strobe, RMS CT = acc0[23:0], RMS Reg = acc2[23:0]
-
-	// Keep track of ADC sample counts and classiffy each sample pair
-	// 0: is start (clear) and first saple of accumulaiton
-    // 1: is the normal accumulation
-    // 2: is RMS^2 calc of CT
-    // 3: is RMS^2 calc of Ref
-	localparam NUM_CYC = 250 * 1;
+	// Run along with adc sample bit arrival
+	// clear accs at start of period
+	// 12 bits shifted in from adc MSB first, stash first as sign
+	// shift into upper 12 bits of srega and sregb
+	// Post counter is normally 0, and is kicked into place teh cycle after the last bit arrived.
+	// post12: For negative add sample to accumulator (selected by adc channel) give us the +1
+	// post11..1: add sreg B conditonally to acc, and shift sreg a <<, and sreg b >>> 
+	// A hight level controller is in charge of claering the accumulators every so often N * 250
+	// to control understanding of the cycles I'll use a 5 bit state machine.
+	// It will run each sample-pair cycle (15khz). chan 0 then chan 1.
+	// state will increment per 12 bits input, and then self increment 12 more times, and then wait for the next cycle.
+	
+	// Sample Counting
 	logic [11:0] sample_count;
-	logic [1:0] stype; // 0:clear, 1:acc, 2:rms CT, 3:rms Ref
 	always @(posedge clk) 
-		sample_count <= ( reset ) ? (NUM_CYC+2-1) : 
+		sample_count <= ( reset ) ? (NUM_SAMPLE-1) : 
 						( !stick ) ? sample_count : 
-						( sample_count == (NUM_CYC+2-1) ) ? 0 : sample_count + 1;
-	assign stype = ( sample_count == 0 ) ? 0 :
-				  ( sample_count == NUM_CYC ) ? 2 :
-				  ( sample_count == NUM_CYC + 1) ? 3 : 1;
+						( sample_count == (NUM_SAMPLE-1) ) ? 0 : sample_count + 1;
+	// high level system tick for sample based control
+	logic win_tick;
+	assign win_tick = ( stick && sample_count == NUM_SAMPLE-1 ) ? 1'b1 : 1'b0;
+	
 	
 	// Detect first bit (MSB) from ADC (for each channel in turn)
 	logic wait_1st, first_bit, rem_bit;
@@ -184,89 +166,59 @@ module lpc_core (
 		pre1 <= pre0;
 	end
 
+	// State transition based control
+	logic [4:0] state;
+	always @(posedge clk) 
+		state <= ( reset ) ? 0 :
+				 ( sstrb && !schan ) ? 0 : // clear for each channel
+				 ( state < 12 || first_bit || rem_bit ) ? state + 1 :
+				 ( state == 12 && rem_bit ) ? 16 :
+				 ( state > 16 && state < 28 ) ? state + 1 : state;
+				 
+
 	// Clear all Accs for stype=0
 	always_comb begin
-		case( stype ) 
-			0 : begin // Initialize (zero) and ADC Accumulate
-					// pre0 - if sign, pre-acc srega to acc[0]=0
-					// pre1 - if sign, pre-acc sregb to acc[1]=1
-					// Const
-					shl_a = 0;
-					sclr = 0;
-					ld_sq = 0;
-					sload = sign & ( pre0 | pre1 );
-					// Strobe, clear if stype == 0;
-					clr_acc = ( sstrb && !schan && stype == 0 ) ? 1'b1 : 1'b0; // init accs at start
-					// First Bit
-					ld_sign = first_bit;
-					// Bit timed
-					addr = del_rem | pre1 ; // 0 then 1 -->  sin then cos
-					wr_acc = rem_bit | del_rem | ( sign & ( pre0 | pre1 ) );
-					shr_a = rem_bit | pre0;
-					shr_b = del_rem | pre1;
-				end
-			1 : begin // Normal ADC accumulate
-					// pre0 - if sign, pre-acc srega to acc[0]=0
-					// pre1 - if sign, pre-acc sregb to acc[1]=1
-					// Const
-					shl_a = 0;
-					sclr = 0;
-					ld_sq = 0;
-					sload = sign & ( pre0 | pre1 );
-					clr_acc = 0;
-					// First Bit
-					ld_sign = first_bit;
-					// Bit timed
-					addr = del_rem | pre1 ; // 0 then 1 -->  sin then cos
-					wr_acc = rem_bit | del_rem | ( sign & ( pre0 | pre1 ) );
-					shr_a = rem_bit | pre0;
-					shr_b = del_rem | pre1;
-				end
-			2 : begin // Chan 0 RMS, save acc0, and clr acc0 then acc0 += acc0^2 then acc0 +=  acc1^2,
-					// First - lo sregs, ld sign, if chan 0 then clr reg
-					// pre0 - if sign, pre-acc srega/b to acc[0]=0 andshl a, and shr b
-					// Const
-					clr_acc = 0;
-					shr_a = 0;
-					// First Bit
-					ld_sq = first_bit; // Load sregs from acc sum
-					ld_sign = first_bit;
-					addr = schan & first_bit ; 
-					sclr = first_bit & !schan; // Clear acc0
-					// Bit Timed
-					sload = sign & pre0;
-					wr_acc = sclr | rem_bit | (sign & pre0);
-					shl_a = rem_bit | pre0 ;
-					shr_b = rem_bit | pre0 ;
-				end
-			3 : begin // chan 1 RMS same, but address the acc2, acc3 and RMS^2 = acc2
-					// Const
-					clr_acc = 0;
-					shr_a = 0;
-					// First Bit
-					ld_sq = first_bit; // Load sregs from acc sum
-					ld_sign = first_bit;
-					addr = schan & first_bit ; 
-					sclr = first_bit & !schan; // Clear acc0
-					// Bit Timed
-					sload = sign & pre0;
-					wr_acc = sclr | rem_bit | (sign & pre0);
-					shl_a = rem_bit | pre0 ;
-					shr_b = rem_bit | pre0 ;
-				end
-		endcase
+		// Defaults on controls
+		ld_sq = first_bit | rem_bit;// shifts in teh ADC into srega and b
+		ld_sign = first_bit;// On the first bit from adc load the sign (msb)
+		addr = schan; 		// Acc accumulator address
+		clr_acc = win_tick;	// clear all accumulators
+		// defulat
+		shl_a = 0;
+		shr_b = 0;
+		sload = 0;
+		wr_acc = 0;
+		// test state to drive square
+		if( state == 16 ) begin
+			shl_a = 1;
+			shr_b = 1;
+			sload = 1;
+			wr_acc = sign; // load '+1' if negative
+		end else if( state > 16 && state < 28 ) begin
+			shl_a = 1; // Keep shifint and condiitonally addign
+			shr_b = 1;
+			wr_acc = 1;
+			sload = 0;
+		end
+		// state should sit at 28 until done
 	end
 
-	// Strobe out calculated RMS
-	logic rms_valid;
-	assign rms_valid = ( stick && stype == 3 ) ? 1'b1 :1'b0;
+	// Do the rms compares
+	logic ct_lt_ref;
+	always @(posedge clk)
+		ct_lt_ref = ( acc_ct < acc_ref ) ? 1'b1 : 1'b0;
+
+	logic ct_gt_max;
+	always @(posedge clk)
+		ct_gt_max = ( acc_ct > NUM_SAMPLE * MAX_RMS * MAX_RMS );
+	
 
 	// Temp Registers
-	logic [35:0] rms_hold_ct, rms_hold_ref;
-	always_ff @(posedge clk) begin
-		rms_hold_ct <= ( reset ) ? 0 : ( rms_valid ) ? acc_ct  : rms_hold_ct;
-		rms_hold_ref<= ( reset ) ? 0 : ( rms_valid ) ? acc_ref : rms_hold_ref;
-	end
+	//logic [35:0] rms_hold_ct, rms_hold_ref;
+	//always_ff @(posedge clk) begin
+	//	rms_hold_ct <= ( reset ) ? 0 : ( win_tick ) ? acc_ct  : rms_hold_ct;
+	//	rms_hold_ref<= ( reset ) ? 0 : ( win_tick ) ? acc_ref : rms_hold_ref;
+	//end
 
 	////////////////
     // LPC Control
@@ -286,8 +238,9 @@ module lpc_core (
 
 	// Setup Mode
 
-	assign { run_led, pump_out  } = rms_hold_ct[35-:2];
-	assign { time_led, fault_led} = rms_hold_ref[35-:2];
+	// test assign outputs, valid with win_tick
+	assign { run_led, pump_out  } = { acc_ct[35], acc_ref[35] };
+	assign { time_led, fault_led} = { ct_lt_ref, ct_gt_max };
 	
 endmodule
 
