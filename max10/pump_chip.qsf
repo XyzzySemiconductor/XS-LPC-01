@@ -38,7 +38,7 @@
 
 
 set_global_assignment -name FAMILY "MAX 10"
-set_global_assignment -name DEVICE 10M04SCE144C8G
+set_global_assignment -name DEVICE 10M25SCE144C8G
 set_global_assignment -name TOP_LEVEL_ENTITY pump_chip
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 23.1STD.0
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "11:07:06  MAY 16, 2024"
@@ -158,28 +158,6 @@ set_location_assignment PIN_140 -to button
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to button
 set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
 set_global_assignment -name VERILOG_MACRO "__ALTERA_STD__=<None>"
-set_global_assignment -name SYSTEMVERILOG_FILE ../src/spi_adc.sv
-set_global_assignment -name VERILOG_FILE ../src/project.v
-set_global_assignment -name SYSTEMVERILOG_FILE ../src/lpc_core.sv
-set_global_assignment -name SYSTEMVERILOG_FILE ../src/cordic.sv
-set_global_assignment -name VERILOG_FILE lib/bvfifo.v
-set_global_assignment -name QIP_FILE lib/bvfifo.qip
-set_global_assignment -name VERILOG_FILE lib/adc_fifo.v
-set_global_assignment -name QIP_FILE lib/adc_fifo.qip
-set_global_assignment -name VERILOG_FILE lib/reg_ioe.v
-set_global_assignment -name SYSTEMVERILOG_FILE hdmi_debug/vga_scope.sv
-set_global_assignment -name SYSTEMVERILOG_FILE hdmi_debug/psram_ctrl.sv
-set_global_assignment -name SYSTEMVERILOG_FILE hdmi_debug/packet_assembler.sv
-set_global_assignment -name SYSTEMVERILOG_FILE hdmi_debug/hdmi_video.sv
-set_global_assignment -name VERILOG_FILE hdmi_debug/hdmi_out.v -library hdmi_out
-set_global_assignment -name QIP_FILE hdmi_debug/hdmi_out.qip
-set_global_assignment -name SYSTEMVERILOG_FILE hdmi_debug/font57.sv
-set_global_assignment -name SYSTEMVERILOG_FILE hdmi_debug/auxiliary_video_information_info_frame.sv
-set_global_assignment -name SYSTEMVERILOG_FILE lib/altera_gpio_lite.sv
-set_global_assignment -name VERILOG_FILE lib/ioe_pads7.v
-set_global_assignment -name QIP_FILE lib/trial_pll.qip
-set_global_assignment -name SYSTEMVERILOG_FILE pump_chip.sv
-set_global_assignment -name QIP_FILE ufm_flash/synthesis/ufm_flash.qip
 set_location_assignment PIN_99 -to fault_led
 set_location_assignment PIN_135 -to period_sw
 set_location_assignment PIN_66 -to timeout_sw
@@ -203,4 +181,26 @@ set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to button
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to period_sw
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to fault_led
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to period_sw
+set_global_assignment -name QIP_FILE ufm_flash_m25/synthesis/ufm_flash.qip
+set_global_assignment -name SYSTEMVERILOG_FILE ../src/spi_adc.sv
+set_global_assignment -name VERILOG_FILE ../src/project.v
+set_global_assignment -name SYSTEMVERILOG_FILE ../src/lpc_core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../src/cordic.sv
+set_global_assignment -name VERILOG_FILE lib/bvfifo.v
+set_global_assignment -name QIP_FILE lib/bvfifo.qip
+set_global_assignment -name VERILOG_FILE lib/adc_fifo.v
+set_global_assignment -name QIP_FILE lib/adc_fifo.qip
+set_global_assignment -name VERILOG_FILE lib/reg_ioe.v
+set_global_assignment -name SYSTEMVERILOG_FILE hdmi_debug/vga_scope.sv
+set_global_assignment -name SYSTEMVERILOG_FILE hdmi_debug/psram_ctrl.sv
+set_global_assignment -name SYSTEMVERILOG_FILE hdmi_debug/packet_assembler.sv
+set_global_assignment -name SYSTEMVERILOG_FILE hdmi_debug/hdmi_video.sv
+set_global_assignment -name VERILOG_FILE hdmi_debug/hdmi_out.v -library hdmi_out
+set_global_assignment -name QIP_FILE hdmi_debug/hdmi_out.qip
+set_global_assignment -name SYSTEMVERILOG_FILE hdmi_debug/font57.sv
+set_global_assignment -name SYSTEMVERILOG_FILE hdmi_debug/auxiliary_video_information_info_frame.sv
+set_global_assignment -name SYSTEMVERILOG_FILE lib/altera_gpio_lite.sv
+set_global_assignment -name VERILOG_FILE lib/ioe_pads7.v
+set_global_assignment -name QIP_FILE lib/trial_pll.qip
+set_global_assignment -name SYSTEMVERILOG_FILE pump_chip.sv
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
