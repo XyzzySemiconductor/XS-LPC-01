@@ -8,29 +8,29 @@ module pump_chip
 )
 
 (
-	////////////
-	// CHIP IO
-	////////////
+	/////////////
+	// LPC CHIP IO
+	/////////////
 
 	// Input Buttons
-	input  logic button,
+	//input  logic button, // pin 140
 
 	// Output LED/SPK
-	output logic time_led,
-	output logic fault_led,
-	output logic run_led,
-	output logic pump_out,
+	//output logic time_led, // pin 101
+	//output logic fault_led, // pin 99
+	//output logic run_led, // pin 100
+	//output logic pump_out, // pin 124
 
 	// External Current Control Input
-	input	 logic setup_sw,
-	input  logic period_sw,
-	input  logic timeout_sw,
+	//input	 logic setup_sw,  // pin 62 
+	//input  logic period_sw,  // pin 135
+	//input  logic timeout_sw, // pin 66 
 
 	// ADC I/O (spi)
-	//output logic adc_ncs, // pin 132
-	//output logic adc_clk, // pin 105
+	//output logic adc_ncs,  // pin 132
+	//output logic adc_clk,  // pin 105
 	//input  logic adc_miso, // pin 106
-	//output logic adc_mosi, // pin 65
+	//output logic adc_mosi, // pin 65 
 
 	////////////
 	// DEBUG IO
@@ -62,11 +62,20 @@ module pump_chip
 	input logic reset_n
 );
 
-	// ADC is internally emulated in the code. Not I/O in this case
-	logic adc_ncs;
-	logic adc_clk;
-	logic adc_miso;
-	logic adc_mosi;
+	// all I/O is internally emulated in the code as we are a full simulation
+	logic adc_ncs;   	// pin 132
+	logic adc_clk;   	// pin 105
+	logic adc_miso;  	// pin 106
+	logic adc_mosi;  	// pin 65 
+	logic setup_sw;  	// pin 62 
+	logic period_sw; 	// pin 135
+	logic timeout_sw;	// pin 66 
+	logic button; 		// pin 140
+	logic time_led; 	// pin 101
+	logic fault_led; 	// pin 99
+	logic run_led; 	// pin 100
+	logic pump_out; 	// pin 124
+
 
 
 	logic [4:0] key; // keypad, bit 4 indicates pressed
