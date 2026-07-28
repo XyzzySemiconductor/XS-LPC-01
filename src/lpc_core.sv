@@ -92,7 +92,7 @@ module lpc_core (
 	logic ld_sq;  	// shifts in teh ADC into srega and b
 	logic ld_sign;	// On the first bit from adc load the sign (msb)
 	logic addr; 	// Acc accumulator address
-	logic shr_a, shr_b, shl_a; // control shift on multplier arguments
+	logic shr_b, shl_a; // control shift on multplier arguments
 	logic sload; 	// forced add
 	logic clr_acc;  // clear all accumulators
 	logic wr_acc; 	// write acc this cycle
@@ -111,7 +111,6 @@ module lpc_core (
 	always @(posedge clk) 
 		srega <= ( reset ) ? 0 :
 				 ( ld_sq ) ? { srega[21-:10], sdata, 12'b0 } : 
-				 ( shr_a ) ? { srega[22], srega[22:1] } : // >>>
 				 ( shl_a ) ? { srega[21:0], 1'b0 } : // <<<
 							   srega;
 
@@ -124,7 +123,7 @@ module lpc_core (
 	
 	// Accumulators
 	always_ff @(posedge clk) begin
-		acc_ct <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ct;
+		acc_ct  <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 0 ) ? sum : acc_ct;
 		acc_ref <= ( reset ) ? 0 : ( clr_acc ) ? 0 : ( wr_acc && addr == 1 ) ? sum : acc_ref;
 	end
 
@@ -183,22 +182,23 @@ module lpc_core (
 		ld_sign = first_bit;// On the first bit from adc load the sign (msb)
 		addr = schan; 		// Acc accumulator address
 		clr_acc = win_tick;	// clear all accumulators
-		// defulat
-		shl_a = 0;
-		shr_b = 0;
-		sload = 0;
-		wr_acc = 0;
 		// test state to drive square
 		if( state == 16 ) begin
 			shl_a = 1;
 			shr_b = 1;
-			sload = 1;
+			sload = 1; // select the '+1' arg
 			wr_acc = sign; // load '+1' if negative
 		end else if( state > 16 && state < 28 ) begin
 			shl_a = 1; // Keep shifint and condiitonally addign
 			shr_b = 1;
 			wr_acc = 1;
 			sload = 0;
+		end else begin
+			// defulat
+			shl_a = 0;
+			shr_b = 0;
+			sload = 0;
+			wr_acc = 0;
 		end
 		// state should sit at 28 until done
 	end
@@ -210,7 +210,7 @@ module lpc_core (
 
 	logic ct_gt_max;
 	always @(posedge clk)
-		ct_gt_max <= ( acc_ct > NUM_SAMPLE * MAX_RMS * MAX_RMS );
+		ct_gt_max <= ( acc_ct > NUM_SAMPLE * MAX_RMS * MAX_RMS ) ? 1'b1 : 1'b0;
 	
 
 	// Temp Registers
