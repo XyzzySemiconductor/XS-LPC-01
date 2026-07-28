@@ -206,11 +206,11 @@ module lpc_core (
 	// Do the rms compares
 	logic ct_lt_ref;
 	always @(posedge clk)
-		ct_lt_ref = ( acc_ct < acc_ref ) ? 1'b1 : 1'b0;
+		ct_lt_ref <= ( acc_ct < acc_ref ) ? 1'b1 : 1'b0;
 
 	logic ct_gt_max;
 	always @(posedge clk)
-		ct_gt_max = ( acc_ct > NUM_SAMPLE * MAX_RMS * MAX_RMS );
+		ct_gt_max <= ( acc_ct > NUM_SAMPLE * MAX_RMS * MAX_RMS );
 	
 
 	// Temp Registers
