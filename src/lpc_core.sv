@@ -100,17 +100,17 @@ module lpc_core (
 	// Sign register
 	always @(posedge clk) 
 		sign <= ( reset ) ? 0 :
-				( ld_sign ) ? sdata : sign;
+				( ld_sign && !button_debounce ) ? sdata : sign; // TODO remove button from here, tied in to keep synth, always zero in tb
 
 	// Srega/b
 	always @(posedge clk) 
 		sregb <= ( reset  ) ? 0 :
-				 ( ld_sq  ) ? { sregb[21-:10], sdata, 12'b0 } : 
+				 ( ld_sq  ) ? { sregb[21-:11], sdata, 11'b0 } : 
 				 ( shr_b  ) ? { sregb[22], sregb[22:1] } : // >>>
 							    sregb;
 	always @(posedge clk) 
 		srega <= ( reset ) ? 0 :
-				 ( ld_sq ) ? { srega[21-:10], sdata, 12'b0 } : 
+				 ( ld_sq ) ? { srega[21-:11], sdata, 11'b0 } : 
 				 ( shl_a ) ? { srega[21:0], 1'b0 } : // <<<
 							   srega;
 
@@ -157,22 +157,16 @@ module lpc_core (
 		wait_1st <= ( reset ) ? 0 : ( sstrb ) ? 1 : ( sdval ) ? 0 : wait_1st;
 	assign first_bit = wait_1st & sdval;
 	assign rem_bit = sdval & !first_bit;
-	// and delayed rem bit to give 4 cycle op after sign known
-	logic del_rem, pre0, pre1;
-	always_ff @(posedge clk) begin
-		del_rem <= rem_bit;
-		pre0 <= first_bit;
-		pre1 <= pre0;
-	end
 
 	// State transition based control
 	logic [4:0] state;
 	always @(posedge clk) 
 		state <= ( reset ) ? 0 :
 				 ( sstrb && !schan ) ? 0 : // clear for each channel
-				 ( state < 12 || first_bit || rem_bit ) ? state + 1 :
-				 ( state == 12 && rem_bit ) ? 16 :
-				 ( state > 16 && state < 28 ) ? state + 1 : state;
+				 ( state < 11 && ( first_bit || rem_bit )) ? state + 1 :
+				 ( state == 11 && rem_bit ) ? 16 :
+				 ( state == 27 ) ? 0 :
+				 ( state >= 16 ) ? state + 1 : state;
 				 
 
 	// Clear all Accs for stype=0
@@ -214,11 +208,11 @@ module lpc_core (
 	
 
 	// Temp Registers
-	//logic [35:0] rms_hold_ct, rms_hold_ref;
-	//always_ff @(posedge clk) begin
-	//	rms_hold_ct <= ( reset ) ? 0 : ( win_tick ) ? acc_ct  : rms_hold_ct;
-	//	rms_hold_ref<= ( reset ) ? 0 : ( win_tick ) ? acc_ref : rms_hold_ref;
-	//end
+	logic [35:0] rms_hold_ct, rms_hold_ref;
+	always_ff @(posedge clk) begin
+		rms_hold_ct <= ( reset ) ? 0 : ( win_tick ) ? acc_ct  : rms_hold_ct;
+		rms_hold_ref<= ( reset ) ? 0 : ( win_tick ) ? acc_ref : rms_hold_ref;
+	end
 
 	////////////////
     // LPC Control
