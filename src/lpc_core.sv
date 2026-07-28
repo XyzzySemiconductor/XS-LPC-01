@@ -218,24 +218,120 @@ module lpc_core (
     // LPC Control
 	////////////////
 
-	// 24hr/6hr period timer
-
-	// With increasingb breathing rate LED
-
+	// 24hr period timer
+	// assume 1/4 sec win_tick
+	logic [18:0] win_cnt;
+	always @(posedge clk)
+		win_cnt <= 	( reset ) ? 0 : 
+					( button_debounce || pump_out ) ? 0 : 
+                   	( win_tick && win_cnt == 19'h54600 ) ? 0 : 
+					( win_tick ) ? win_cnt + 1 : win_cnt;
+	
+	// Modulate life led based on 24hr countdown (fast as time gets closer)
+	// Say pick the given Hz-ish range bit, ghiher and higher freq as the upper bits decrement
+	always @(posedge clk)
+		time_led <= ( reset ) ? 0 :
+					( setup_sw ) ?  win_cnt[win_cnt[18-:3]] : 
+					( !setup_sw && !win_tick ) ? ct_lt_ref : time_led;
+	
 	// Over Current Logic
+	// 4 sec 15amp
+	// 16 consecutive samples over 15amps RMS
+	// In auto mode triggers stop, latched until stops
+	logic [3:0] ovl_cnt;
+	always @(posedge clk) 
+		ovl_cnt <= ( reset ) ? 0 : 
+					( !pump_out ) ? 0 :
+					( win_tick && !ct_gt_max ) ? 0 :
+					( win_tick && ct_gt_max && ovl_cnt != 15 ) ? ovl_cnt + 1 : ovl_cnt;
+	logic ovl_flag;
+	always @(posedge clk) 
+		ovl_flag <= ( reset ) ? 0 : 
+					( !pump_out ) ? 0 :
+					(  pump_out && ovl_cnt == 15 && win_tick ) ? 1 : ovl_flag;
 
 	// Low Current Logic
-
+	// 2 cycles (1/2sec) of under current triggers auto mode stop
+	logic ltref_last;
+	always @(posedge clk) 
+		ltref_last <= ( reset ) ? 0 : 
+						( !pump_out ) ? 0 :
+						 ( ct_lt_ref && win_tick ) ? 1 : ltref_last;
+	logic ufl_flag;
+	always @(posedge clk) 
+		ufl_flag <= ( reset ) ? 0 : 
+					( !pump_out ) ? 0 :
+					( ltref_last && ct_lt_ref && win_tick ) ? 1 : ufl_flag;
+	
 	// Timeout Logic
+	// timeout (3,6,12,24sec-ish), 
+	// Set at start of auto cycle
+	// count down win_ticks.
+	// Signal end when done.
+
+	logic [10:0] timesel;
+	assign timesel = ( period_sw && timeout_sw ) ? 3*60*4 :
+					 ( !period_sw && timeout_sw ) ? 6*60*4 :
+					 ( period_sw && !timeout_sw ) ?12*60*4 : 24*60*4;
+
+	logic [10:0] timeout_cnt;
+	always @(posedge clk) 
+		timeout_cnt <= ( reset ) ? 0 : 
+					( !pump_out ) ? 0 :
+					( win_tick && timeout_cnt != timesel ) ? timeout_cnt + 1 : timeout_cnt;
+
+	logic timeout;
+	always @(posedge clk) 
+		timeout  <= ( reset ) ? 0 : 
+					( !pump_out ) ? 0 :
+					( win_tick && timeout_cnt == timesel ) ? 1 : ufl_flag;
+
 
 	// Pump Cycle Logic
+	// first rule, pump led follows pump output, 
+    // Pump output is always on if button is pressed
+    // Pump output follows button in setup mode.
+	// In automode it does the button or 24hr start, and stop
+	// pump led is driven here.
 
 	// Setup Mode
+	// !setup_sw (active low)
+	// In setup pump output is off when button is off
+	// In setup the time/fault leds are wired compelemted to the compare.
+	// TIme lights are  powered above
 
-	// test assign outputs, valid with win_tick
-	assign { run_led, pump_out  } = { acc_ct[35], acc_ref[35] };
-	assign { time_led, fault_led} = { ct_lt_ref, ct_gt_max };
-	
+	// Fault state and LED:
+	logic [1:0] fault;
+	always @(posedge clk) 
+		fault    <= ( reset ) ? 0 : 
+					( pump_out ) ? 0 : // clear on pump on
+					( fault == 0 && ovl_flag ) ? 2 : // over current
+					( fault == 0 && timeout  ) ? 1  : // timeout
+								   fault;
+	always @(posedge clk) 
+		fault_led <= ( reset ) ? 0 : 
+					( !setup_sw ) ? ((win_tick) ? ct_lt_ref : fault_led) :
+					( pump_out ) ? 0 :
+					( fault != 0 && win_cnt[2:0] == 0 || fault == 2 && win_cnt[2:0] == 2 ) ? 1'b1 : 1'b0;
+
+	// Auto mode
+	// In auto pump output is (re)started by pressing the button or 24hr ellapse
+	// In auto the pump remains on after button release.
+ 	// Turns off on low current (empty) (under current 1/2 sec), 
+	// or overcurrent (15Amp 4 sec-ish
+	// after finish the fault light signals last result run. blinks: 1-timeout, 2-overcurrent, none if low current (expected)
+    
+	// Pump Reg
+	always @(posedge clk) 
+		pump_out <= ( reset ) ? 0 :
+					( button_debounce ) ? 1 : 
+					( !setup_sw && !button_debounce ) ? 0 :
+					( ovl_flag || ufl_flag || timeout ) ? 0 : pump_out;
+
+	// Run Led follows pump output
+	always @(posedge clk)
+		run_led <= pump_out;
+
 endmodule
 
 module forge_debounce(
