@@ -236,17 +236,12 @@ module adc_spi_simulate
 	always_ff @(posedge clk) 
 		state <= ( reset ) ? 0 : ( ncs_fall ) ? 0 : ( clk_rise && state < 17 ) ? state + 1 : state;
 
-	// Latch the channel from mosi
-	logic chan_reg;
-	always_ff @(posedge clk) 
-		chan_reg <= ( reset ) ? 0 : ( clk_rise && state == 2 ) ? ad_mosi : chan_reg;
-
 	// sreg load from chan, and shift out
 	logic [12:0] sreg;
 	always_ff @(posedge clk) 
 		sreg <= ( reset ) ? 0 : ( ad_ncs ) ? 0 :
-                                ( clk_rise && state == 2 && chan_reg == 0 ) ? {1'b0, din0} :
-		                        ( clk_rise && state == 2 && chan_reg == 1 ) ? {1'b0, din1} :
+                                ( clk_rise && state == 2 && ad_mosi == 0 ) ? {1'b0, din0} :
+		                        ( clk_rise && state == 2 && ad_mosi == 1 ) ? {1'b0, din1} :
 								( clk_fall && state >= 5 ) ? { sreg[11:0], 1'b0 } : sreg;
 
 	// assign output miso 

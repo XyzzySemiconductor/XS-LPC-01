@@ -264,7 +264,7 @@ module pump_chip
     );
 
 	assign din0 = cos3x;
-	assign din1 = sin3x;
+	assign din1 = 900; //sin3x;
 
   	/////////////////////
 	// ADC Monitor
@@ -287,6 +287,42 @@ module pump_chip
         .strobe( mstrobe ) // indicates dout1 was updated
     );
 
+	//////////////////////////
+	// RMS calc on Monitors
+	//////////////////////////
+
+
+	// Quick and large RMS
+	logic [1:0][31:0] rms_sum;
+	logic       [ 7:0] rms_count;
+	logic [1:0][11:0] rms_hold;
+	logic [1:0][23:0] rms_sq;
+	assign rms_sq[0] = (( dout0[11] ) ? -dout0 : dout0) * (( dout0[11] ) ? -dout0 : dout0);
+	assign rms_sq[1] = (( dout1[11] ) ? -dout1 : dout1) * (( dout1[11] ) ? -dout1 : dout1);
+	always @(posedge clk) begin
+		if( reset ) begin
+				rms_sum <= 0;
+				rms_count <= 0;
+				rms_hold <= 0;
+		end else begin
+			if( mstrobe ) begin
+				rms_count   <= (rms_count == 249) ? 0 : rms_count + 1;
+				rms_sum[0] 	<= (rms_count == 249) ? rms_sq[0] : rms_sq[0] + rms_sum[0]; 
+				rms_sum[1] 	<= (rms_count == 249) ? rms_sq[1] : rms_sq[1] + rms_sum[1]; 
+				rms_hold[0] <= (rms_count == 249) ? rms_sum[0][31-:12] : rms_hold[0];
+				rms_hold[1] <= (rms_count == 249) ? rms_sum[1][31-:12] : rms_hold[1];
+			end
+		end
+	end
+
+	
+	// Scope monitor probes 
+	logic signed [4:0][11:0] probe;
+	assign probe[0] = dout0;
+	assign probe[1] = dout1;
+	assign probe[2] = rms_hold[0];
+	assign probe[3] = rms_hold[1];
+	assign probe[4] = dout0>>>1;
 
 	
 	//////////////////////////////
@@ -334,11 +370,11 @@ module pump_chip
 		
 	// monitor 5x 12-bit analog channels
 	
-	assign mad_a0 = 12'h7ff ^ din0;
-	assign mad_a1 = 12'h7ff ^ din1;
-	assign mad_b0 = 12'h7ff ^ dout0;
-	assign mad_b1 = 12'h7ff ^ dout1;
-	assign iest   = 12'h7ff ^ 0;
+	assign mad_a0 = 12'h7FF ^ probe[0];
+	assign mad_a1 = 12'h7FF ^ probe[1];
+	assign mad_b0 = 12'h7FF ^ probe[2];
+	assign mad_b1 = 12'h7FF ^ probe[3];
+	assign iest   = 12'h7FF ^ probe[4];
 							
 	// Fast Scope is used to capture fast SPI comms signalling.
 	// Fast scope is 5 binary channels (cs+4data). Scope triggers on rising CS, restarting at 1Hz. Use any fast clk (6Mhz to 192Mhz), displays in window.
