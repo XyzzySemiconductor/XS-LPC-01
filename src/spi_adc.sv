@@ -168,8 +168,8 @@ module adc_spi_monitor
 
 	// After loading last bit, copy to correct data output reg
 	always_ff @(posedge clk) begin
-		dout0 <= ( reset ) ? 0 : ( chan_reg == 0 && del_last ) ? in_reg : dout0;
-		dout1 <= ( reset ) ? 0 : ( chan_reg == 1 && del_last ) ? in_reg : dout1;
+		dout0 <= ( reset ) ? 0 : ( chan_reg == 0 && del_last ) ? 12'h800 ^ in_reg : dout0;
+		dout1 <= ( reset ) ? 0 : ( chan_reg == 1 && del_last ) ? 12'h800 ^ in_reg : dout1;
 	end
 
 	// Delay d1load to generate otuptu strobe
@@ -240,8 +240,8 @@ module adc_spi_simulate
 	logic [12:0] sreg;
 	always_ff @(posedge clk) 
 		sreg <= ( reset ) ? 0 : ( ad_ncs ) ? 0 :
-                                ( clk_rise && state == 2 && ad_mosi == 0 ) ? {1'b0, din0} :
-		                        ( clk_rise && state == 2 && ad_mosi == 1 ) ? {1'b0, din1} :
+                                ( clk_rise && state == 2 && ad_mosi == 0 ) ? {1'b0, din0 ^ 12'h800 } : // covert from 2's comp to centered adc
+		                        ( clk_rise && state == 2 && ad_mosi == 1 ) ? {1'b0, din1 ^ 12'h800 } :
 								( clk_fall && state >= 5 ) ? { sreg[11:0], 1'b0 } : sreg;
 
 	// assign output miso 

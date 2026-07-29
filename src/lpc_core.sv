@@ -5,6 +5,9 @@ module lpc_core (
 	// System
 	input logic clk,
 	input logic reset,
+	// FPGA debug probes
+	output logic [31:0] fpga_probe,
+	output logic [31:0] fpga_probe2,
 	// Digial Inputs
 	input logic button,
 	input logic period_sw,
@@ -49,19 +52,22 @@ module lpc_core (
     	.ad_miso( adc_miso ),
     	// ADC monitor outputs
     	.tick( stick ), // sample cycle begin
-    	.dout( sdata ), // serial output
+    	.dout( sdata ), // serial output, need to invert 1st/sign bit to get 2's comp
     	.chan( schan ), // Indicate chan 0 or 1
     	.dval( sdval ), // Indicates valid bit 
     	.strb( sstrb ) // indicates start of channel 
 	);
 
-	// Test shift registers
-	logic [11:0] sreg, data0, data1;
+	// Test shift registers, It should be removed during synth (I hope)
+	logic [11:0] sreg, dp0, dp1, data0, data1;
 	always_ff @(posedge clk) begin
 		sreg <= (reset)?0:(sdval)?{sreg[10:0],sdata}:sreg;
-		data0 <= (reset)?0:(sstrb&&schan)?sreg:data0;
-		data1 <= (reset)?0:(sstrb&&!schan)?sreg:data1;
+		dp0 <= (reset)?0:(sstrb&& schan)?sreg:dp0;  
+		dp1 <= (reset)?0:(sstrb&&!schan)?sreg:dp1;
 	end
+	assign data0 = 12'h800 ^ dp0;
+	assign data1 = 12'h800 ^ dp1;
+	
 
 	////////////////
 	// Debounce
@@ -89,6 +95,7 @@ module lpc_core (
 	logic signed [22:0] sregb;
 
 	// data path Controls
+	logic wait_1st, first_bit, rem_bit;
 	logic ld_sq;  	// shifts in teh ADC into srega and b
 	logic ld_sign;	// On the first bit from adc load the sign (msb)
 	logic addr; 	// Acc accumulator address
@@ -100,17 +107,17 @@ module lpc_core (
 	// Sign register
 	always @(posedge clk) 
 		sign <= ( reset ) ? 0 :
-				( ld_sign && !button_debounce ) ? sdata : sign; // TODO remove button from here, tied in to keep synth, always zero in tb
+				( ld_sign ) ? (first_bit^sdata) : sign; // invert sign!!
 
 	// Srega/b
 	always @(posedge clk) 
 		sregb <= ( reset  ) ? 0 :
-				 ( ld_sq  ) ? { sregb[21-:11], sdata, 11'b0 } : 
+				 ( ld_sq  ) ? { sregb[21-:11], (first_bit^sdata), 11'b0 } : 
 				 ( shr_b  ) ? { sregb[22], sregb[22:1] } : // >>>
 							    sregb;
 	always @(posedge clk) 
 		srega <= ( reset ) ? 0 :
-				 ( ld_sq ) ? { srega[21-:11], sdata, 11'b0 } : 
+				 ( ld_sq ) ? { srega[21-:11], (first_bit^sdata), 11'b0 } : 
 				 ( shl_a ) ? { srega[21:0], 1'b0 } : // <<<
 							   srega;
 
@@ -152,7 +159,7 @@ module lpc_core (
 	
 	
 	// Detect first bit (MSB) from ADC (for each channel in turn)
-	logic wait_1st, first_bit, rem_bit;
+
 	always_ff @(posedge clk) 
 		wait_1st <= ( reset ) ? 0 : ( sstrb ) ? 1 : ( sdval ) ? 0 : wait_1st;
 	assign first_bit = wait_1st & sdval;
@@ -213,7 +220,11 @@ module lpc_core (
 		rms_hold_ct <= ( reset ) ? 0 : ( win_tick ) ? acc_ct  : rms_hold_ct;
 		rms_hold_ref<= ( reset ) ? 0 : ( win_tick ) ? acc_ref : rms_hold_ref;
 	end
-
+	
+	assign fpga_probe = rms_hold_ct[31-:32];  // FPGA debug only
+	assign fpga_probe2 = rms_hold_ref[31-:32];  // FPGA debug only
+	
+	
 	////////////////
     // LPC Control
 	////////////////

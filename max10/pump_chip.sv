@@ -145,10 +145,8 @@ module pump_chip
 	
   // Fpga probes
 
-	wire dc_thresh;
-	wire ac_thresh;
-	wire signed [11:0] ac_acc;	
-	wire signed [11:0] dc_acc;	
+	logic [31:0] fpga_probe;	
+	logic [31:0] fpga_probe2;	
 
 	// Register ADC I/O
 		
@@ -163,6 +161,8 @@ module pump_chip
 		// System
 		.clk			( clk ),
 		.reset 		( reset ),
+		.fpga_probe ( fpga_probe ),
+		.fpga_probe2 ( fpga_probe2 ),
 		// Dig IO
 		.button		( button ),
 		.setup_sw	( setup_sw ),
@@ -257,8 +257,8 @@ module pump_chip
         .ad_mosi( adc_mosi ),
         .ad_miso( adc_miso ),
         // ADC monitor outputs
-        .din0( din0 ), // serial output
-        .din1( din1 ), // serial output
+        .din0( din0 ), // adc input signed for sim input
+        .din1( din1 ), // adc input signed for sim input
         .strb0( sstrb0 ), // indicateds data sampled
         .strb1( sstrb1 ) 
     );
@@ -270,7 +270,7 @@ module pump_chip
 	// ADC Monitor
   	/////////////////////
 
-    wire [11:0] dout0, dout1;
+    wire signed [11:0] dout0, dout1;
 	wire mstrobe;
     adc_spi_monitor i_adc_mon (
         // Input clock,
@@ -282,11 +282,11 @@ module pump_chip
         .ad_mosi( adc_mosi ),
         .ad_miso( adc_miso ),
         // ADC monitor outputs
-        .dout0( dout0 ), // serial output
-        .dout1( dout1 ), // serial output
+        .dout0( dout0 ), // signed for mon output
+        .dout1( dout1 ), // signed for mon output
         .strobe( mstrobe ) // indicates dout1 was updated
     );
-
+	
 	//////////////////////////
 	// RMS calc on Monitors
 	//////////////////////////
@@ -295,7 +295,7 @@ module pump_chip
 	// Quick and large RMS
 	logic [1:0][31:0] rms_sum;
 	logic       [ 7:0] rms_count;
-	logic [1:0][11:0] rms_hold;
+	logic [1:0][31:0] rms_hold;
 	logic [1:0][23:0] rms_sq;
 	assign rms_sq[0] = (( dout0[11] ) ? -dout0 : dout0) * (( dout0[11] ) ? -dout0 : dout0);
 	assign rms_sq[1] = (( dout1[11] ) ? -dout1 : dout1) * (( dout1[11] ) ? -dout1 : dout1);
@@ -309,8 +309,8 @@ module pump_chip
 				rms_count   <= (rms_count == 249) ? 0 : rms_count + 1;
 				rms_sum[0] 	<= (rms_count == 249) ? rms_sq[0] : rms_sq[0] + rms_sum[0]; 
 				rms_sum[1] 	<= (rms_count == 249) ? rms_sq[1] : rms_sq[1] + rms_sum[1]; 
-				rms_hold[0] <= (rms_count == 249) ? rms_sum[0][31-:12] : rms_hold[0];
-				rms_hold[1] <= (rms_count == 249) ? rms_sum[1][31-:12] : rms_hold[1];
+				rms_hold[0] <= (rms_count == 249) ? rms_sum[0] : rms_hold[0];
+				rms_hold[1] <= (rms_count == 249) ? rms_sum[1] : rms_hold[1];
 			end
 		end
 	end
@@ -320,9 +320,9 @@ module pump_chip
 	logic signed [4:0][11:0] probe;
 	assign probe[0] = dout0;
 	assign probe[1] = dout1;
-	assign probe[2] = rms_hold[0];
-	assign probe[3] = rms_hold[1];
-	assign probe[4] = dout0>>>1;
+	assign probe[2] = rms_hold[0][30-:12];
+	assign probe[3] = rms_hold[1][30-:12];
+	assign probe[4] = fpga_probe[30-:12]; //dout0 >>> 1;
 
 	
 	//////////////////////////////
@@ -370,11 +370,11 @@ module pump_chip
 		
 	// monitor 5x 12-bit analog channels
 	
-	assign mad_a0 = 12'h7FF ^ probe[0];
-	assign mad_a1 = 12'h7FF ^ probe[1];
-	assign mad_b0 = 12'h7FF ^ probe[2];
-	assign mad_b1 = 12'h7FF ^ probe[3];
-	assign iest   = 12'h7FF ^ probe[4];
+	assign mad_a0 = 12'h7ff ^ probe[0];
+	assign mad_a1 = 12'h7ff ^ probe[1];
+	assign mad_b0 = 12'h7ff ^ probe[2];
+	assign mad_b1 = 12'h7ff ^ probe[3];
+	assign iest   = 12'h7ff ^ probe[4];
 							
 	// Fast Scope is used to capture fast SPI comms signalling.
 	// Fast scope is 5 binary channels (cs+4data). Scope triggers on rising CS, restarting at 1Hz. Use any fast clk (6Mhz to 192Mhz), displays in window.
@@ -989,18 +989,22 @@ module pump_chip
 
 	
 	// Port Names
-	logic [3:0] in_str;
-   //string_overlay #(.LEN(3)) _in0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h01), .out( in_str[0]), .str("VAC") );
-	//string_overlay #(.LEN(3)) _in1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h03), .out( in_str[1]), .str("VDC") );
-	//string_overlay #(.LEN(3)) _in2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h05), .out( in_str[2]), .str("SAC") );
-	//string_overlay #(.LEN(3)) _in3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h07), .out( in_str[3]), .str("SDC") );
+	logic [5:0] in_str;
+   string_overlay #(.LEN(3)) _in0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h01), .out( in_str[0]), .str("Ch0") );
+	string_overlay #(.LEN(3)) _in1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h03), .out( in_str[1]), .str("Ch1") );
+	string_overlay #(.LEN(4)) _in2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h46),.y('h05), .out( in_str[2]), .str("Rms0") );
+	string_overlay #(.LEN(4)) _in3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h46),.y('h07), .out( in_str[3]), .str("Rms1") );
+	string_overlay #(.LEN(5)) _in4 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h45),.y('h09), .out( in_str[4]), .str("fpga0") );
+	string_overlay #(.LEN(5)) _in5 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h45),.y('h0B), .out( in_str[5]), .str("fpga1") );
 	
 	// 12bit hex overlays(4)
-	logic [3:0] hex_str;
-	//hex_overlay #(.LEN(3)) _hex0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h01), .out( hex_str[0]), .in( value_1 ) );
-	//hex_overlay #(.LEN(3)) _hex1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h03), .out( hex_str[1]), .in( value_2 ) );
-	//hex_overlay #(.LEN(3)) _hex2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h05), .out( hex_str[2]), .in( value_3 ) );
-	//hex_overlay #(.LEN(3)) _hex3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h07), .out( hex_str[3]), .in( value_4 ) );
+	logic [5:0] hex_str;
+	hex_overlay #(.LEN(3)) _hex0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h01), .out( hex_str[0]), .in( dout0 ) );
+	hex_overlay #(.LEN(3)) _hex1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h03), .out( hex_str[1]), .in( dout1 ) );
+	hex_overlay #(.LEN(8)) _hex2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h05), .out( hex_str[2]), .in( rms_hold[0] ) );
+	hex_overlay #(.LEN(8)) _hex3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h07), .out( hex_str[3]), .in( rms_hold[1] ) );
+	hex_overlay #(.LEN(8)) _hex4 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h09), .out( hex_str[4]), .in( fpga_probe ) );
+	hex_overlay #(.LEN(8)) _hex5 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h0B), .out( hex_str[5]), .in( fpga_probe2 ) );
 					
 	// dump binary	values	
 	logic [3:0] bin_str;
