@@ -822,19 +822,19 @@ module pump_chip
    //bin_overlay    #(.LEN(1 )) _id2(.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y),.bin_char(bin_char), .x('h46),.y('h09), .out( id_str[2]), .in( disp_id == 32'h0E96_0001 ) );
 	//string_overlay #(.LEN(12)) _id3(.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y),.ascii_char(ascii_char), .x('d120),.y('d59), .out( id_str[3]), .str( "ERIC PEARSON" ) );
 	string_overlay #(.LEN( 9)) _id4 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h02),.y('h03), .out(id_str[4]), 
-	.str(	( zoom == 0 ) ? " 21us/div" :
-			( zoom == 1 ) ? " 43us/div" :
-			( zoom == 2 ) ? " 85us/div" :
-			( zoom == 3 ) ? "170us/div" :
-			( zoom == 4 ) ? "340us/div" :
-			( zoom == 5 ) ? "680us/div" :
-			( zoom == 6 ) ? "1.4ms/div" :
-			( zoom == 7 ) ? "2.7ms/div" :
-			( zoom == 8 ) ? "5.5ms/div" :
-			( zoom == 9 ) ? " 11ms/div" :
-			( zoom == 10) ? " 22ms/div" :
-			( zoom == 11) ? " 44ms/div" :
-			/*zoom == 12)*/ " 87ms/div" ) );
+	.str(	( zoom == 0 ) ? "  4ms/div" :
+			( zoom == 1 ) ? "  8ms/div" :
+			( zoom == 2 ) ? " 16ms/div" :
+			( zoom == 3 ) ? " 25ms/div" :
+			( zoom == 4 ) ? " 50ms/div" :
+			( zoom == 5 ) ? "100ms/div" :
+			( zoom == 6 ) ? "250ms/div" :
+			( zoom == 7 ) ? "500ms/div" :
+			( zoom == 8 ) ? "  1 s/div" :
+			( zoom == 9 ) ? "  2 s/div" :
+			( zoom == 10) ? "  5 s/div" :
+			( zoom == 11) ? " 10 s/div" :
+			/*zoom == 12)*/ " 20 s/div" ) );
 
 	
 	// Overlay the Keystroke
@@ -954,37 +954,36 @@ module pump_chip
 	
 	// Port Names
 	logic [3:0] in_str;
-   string_overlay #(.LEN(3)) _in0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h01), .out( in_str[0]), .str("VAC") );
-	string_overlay #(.LEN(3)) _in1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h03), .out( in_str[1]), .str("VDC") );
-	string_overlay #(.LEN(3)) _in2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h05), .out( in_str[2]), .str("SAC") );
-	string_overlay #(.LEN(3)) _in3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h07), .out( in_str[3]), .str("SDC") );
+   //string_overlay #(.LEN(3)) _in0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h01), .out( in_str[0]), .str("VAC") );
+	//string_overlay #(.LEN(3)) _in1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h03), .out( in_str[1]), .str("VDC") );
+	//string_overlay #(.LEN(3)) _in2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h05), .out( in_str[2]), .str("SAC") );
+	//string_overlay #(.LEN(3)) _in3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('h47),.y('h07), .out( in_str[3]), .str("SDC") );
 	
 	// 12bit hex overlays(4)
 	logic [3:0] hex_str;
-	hex_overlay #(.LEN(3)) _hex0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h01), .out( hex_str[0]), .in( value_1 ) );
-	hex_overlay #(.LEN(3)) _hex1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h03), .out( hex_str[1]), .in( value_2 ) );
-	hex_overlay #(.LEN(3)) _hex2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h05), .out( hex_str[2]), .in( value_3 ) );
-	hex_overlay #(.LEN(3)) _hex3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h07), .out( hex_str[3]), .in( value_4 ) );
+	//hex_overlay #(.LEN(3)) _hex0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h01), .out( hex_str[0]), .in( value_1 ) );
+	//hex_overlay #(.LEN(3)) _hex1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h03), .out( hex_str[1]), .in( value_2 ) );
+	//hex_overlay #(.LEN(3)) _hex2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h05), .out( hex_str[2]), .in( value_3 ) );
+	//hex_overlay #(.LEN(3)) _hex3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .hex_char(hex_char), .x('h4B),.y('h07), .out( hex_str[3]), .in( value_4 ) );
 					
 	// dump binary	values	
 	logic [3:0] bin_str;
-	bin_overlay #(.LEN(12)) _bin0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h50), .y('h01), .out( bin_str[0] ), .in( value_1 ) );
-	bin_overlay #(.LEN(12)) _bin1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h50), .y('h03), .out( bin_str[1] ), .in( value_2 ) );
-	bin_overlay #(.LEN(12)) _bin2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h50), .y('h05), .out( bin_str[2] ), .in( value_3 ) );
-	bin_overlay #(.LEN(12)) _bin3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h50), .y('h07), .out( bin_str[3] ), .in( value_4 ) );
+	//bin_overlay #(.LEN(12)) _bin0 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h50), .y('h01), .out( bin_str[0] ), .in( value_1 ) );
+	//bin_overlay #(.LEN(12)) _bin1 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h50), .y('h03), .out( bin_str[1] ), .in( value_2 ) );
+	//bin_overlay #(.LEN(12)) _bin2 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h50), .y('h05), .out( bin_str[2] ), .in( value_3 ) );
+	//bin_overlay #(.LEN(12)) _bin3 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .bin_char(bin_char), .x('h50), .y('h07), .out( bin_str[3] ), .in( value_4 ) );
 
    // Text legend
    logic [7:0] leg_str;
-   string_overlay #(.LEN(8)) i_leg00 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+0), .out( leg_str[0] ), .str("Gain DC ") );
-   string_overlay #(.LEN(8)) i_leg01 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+1), .out( leg_str[1] ), .str("Gain AC ") );
-   string_overlay #(.LEN(8)) i_leg02 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+2), .out( leg_str[2] ), .str("Gain Out") );
-   string_overlay #(.LEN(8)) i_leg03 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+3), .out( leg_str[3] ), .str("Gain_Sin") );
-   string_overlay #(.LEN(8)) i_leg04 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+4), .out( leg_str[4] ), .str("Pwm_Vref") );
-   string_overlay #(.LEN(8)) i_leg05 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+5), .out( leg_str[5] ), .str("Pwm_Dump") );
-   string_overlay #(.LEN(8)) i_leg06 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+6), .out( leg_str[6] ), .str("ACthresh") );
-   string_overlay #(.LEN(8)) i_leg07 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+7), .out( leg_str[7] ), .str("DCthresh") );
-
-	
+   string_overlay #(.LEN(7)) i_leg00 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+0), .out( leg_str[0] ), .str("Pump   ") );
+   string_overlay #(.LEN(7)) i_leg01 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+1), .out( leg_str[1] ), .str("Button ") );
+   string_overlay #(.LEN(7)) i_leg02 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+2), .out( leg_str[2] ), .str("timeout") );
+   string_overlay #(.LEN(7)) i_leg03 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+3), .out( leg_str[3] ), .str("period ") );
+   string_overlay #(.LEN(7)) i_leg04 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+4), .out( leg_str[4] ), .str("setup  ") );
+   string_overlay #(.LEN(7)) i_leg05 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+5), .out( leg_str[5] ), .str("Run    ") );
+   string_overlay #(.LEN(7)) i_leg06 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+6), .out( leg_str[6] ), .str("Fault  ") );
+   string_overlay #(.LEN(7)) i_leg07 (.clk(hdmi_clk), .reset(reset), .char_x(char_x), .char_y(char_y), .ascii_char(ascii_char), .x('d3),.y('d50+7), .out( leg_str[7] ), .str("Time   ") );
+							
 	
 	// Merge overlays
 	logic overlay;
