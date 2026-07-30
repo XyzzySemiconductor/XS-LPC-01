@@ -156,6 +156,7 @@ set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_RO
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
 set_global_assignment -name VERILOG_MACRO "__ALTERA_STD__=<None>"
+set_global_assignment -name SYSTEMVERILOG_FILE ../test/pump_model.sv
 set_global_assignment -name SDC_FILE pump_chip.sdc
 set_global_assignment -name QIP_FILE ufm_flash_m25/synthesis/ufm_flash.qip
 set_global_assignment -name SYSTEMVERILOG_FILE ../src/spi_adc.sv

@@ -187,64 +187,46 @@ module pump_chip
   	/////////////////////
   	//////////////////////
 
-  	/////////////////////
-	// 60 Hz sin/cos cordic
-  	/////////////////////
-
-	// create /16 sample flag
-	reg [3:0] sample_count;
-	wire sample_flag;
-	always @(posedge clk)
-		sample_count <= ( reset ) ? 0 : sample_count + 1;
-	assign sample_flag = ( sample_count == 15 ) ? 1'b1 : 1'b0;
 	
-	// Create the -pi/2 to pi/2 angle sweep
-    reg signed [15:0] angle;
-    always @(posedge clk) begin
-        if( reset ) begin
-            angle <= -12500;
-        end else if ( sample_flag ) begin
-            angle <= ( angle == 12499 ) ? -12500 : angle + 1;
-        end
-    end
+	/////////////////////
+	// Pump System Model
+  	/////////////////////
 
-	// create polarity correction
-    reg polarity;
-    always @(posedge clk) begin
-        if( reset ) begin
-            polarity <= 1;
-        end else if ( sample_flag ) begin
-            polarity <= ( angle == 12499 ) ? !polarity : polarity;
-        end
-    end
+	// 4 Hz (or 60 Hz for 15x faster that realtime
+	logic [23:0] tick_cnt;
+	always_ff @(posedge clk) 
+		tick_cnt <= ( reset ) ? 0 : ( tick_cnt == (48000000 / 60) - 1 ) ? 0 : tick_cnt + 1;
+	logic sys_tick;
+	always_ff @(posedge clk) 
+		sys_tick <=  ( tick_cnt == (48000000 / 60) - 1 ) ? 1'b1 : 1'b0 ;	// 15x faster realtime
+		//tick <=  ( tick_cnt == (48000000 / 4 ) - 1 ) ? 1'b1 : 1'b0 ; 	// Realtime
 
-	// Cordic 50K point = 2*PI
-    wire [15:0] sin_out, cos_out;
-    cordic_sincos_50000_core_20 i_tb_sin(
-        .clk( clk ),
-        .rst( reset ),
-        .start( sample_flag ),
-        .angle_in( angle ),
-        .sin_out ( sin_out ),
-        .cos_out ( cos_out ),
-        .valid( ),
-        .busy( )
-    );
-
-	// Corect polarity
-   	wire [15:0] cos_pol, sin_pol;
-    assign cos_pol = ( polarity ) ? ~cos_out : cos_out;
-    assign sin_pol = ( polarity ) ? ~sin_out : sin_out;
-	// scale 3/8 so peaks at +/-1544, about 75% full scale
-    wire [11:0] cos3x, sin3x;
-    assign cos3x = cos_pol[15-:12] + { cos_pol[15], cos_pol[15-:11] };
-    assign sin3x = sin_pol[15-:12] + { sin_pol[15], sin_pol[15-:11] };
-
+	logic signed [11:0] sys_ct;
+	pump_model 
+	#(
+		.SP_STALL ( 12'sd1024 ),	// >= 15 amps rms
+		.SP_RUN 	 ( 12'sd666  ),	// typical 10 amps rms
+		.SP_EMPTY ( 12'sd500  ),	// empty say 9 amps rms
+		.SP_OFF	 ( 12'sd100 	 )		// Off still ac noise 0.1 amps rms
+	) i_pump (
+		// System
+		.clk		( clk ),
+		.reset	( reset ),
+		.tick		( sys_tick ),// 250ms in sim step time. 
+		.pump_out( 1'b1 ),//pump_out ),	// signal to turn on pump
+		.ct		( sys_ct ),	// range +/-2000 is +/-30 Amps isntantaneous (typicaol 10Amp RMS = +/-15Amps
+		.empty	( 1'b0 ), 	// change setpoint to empty current if not start current
+		.stall	( 1'b0 ), 	// change to the stall current (or keep it in stall after start)
+		.n_empty	( 1'b0 ) 	// change to the normal curretn (if not start current
+	);	
+	
+	
+	
   	/////////////////////
 	// ADC device Simulation
   	/////////////////////
 
-    wire [11:0] din0, din1;
+
 	wire sstrb0, sstrb1;
 	
     adc_spi_simulate i_adc_sim (
@@ -257,21 +239,18 @@ module pump_chip
         .ad_mosi( adc_mosi ),
         .ad_miso( adc_miso ),
         // ADC monitor outputs
-        .din0( din0 ), // adc input signed for sim input
-        .din1( din1 ), // adc input signed for sim input
+        .din0( sys_ct ), // adc input signed for sim input
+        .din1( 900 ), // adc input signed for sim input
         .strb0( sstrb0 ), // indicateds data sampled
         .strb1( sstrb1 ) 
     );
-
-	assign din0 = cos3x;
-	assign din1 = 900; //sin3x;
 
   	/////////////////////
 	// ADC Monitor
   	/////////////////////
 
     wire signed [11:0] dout0, dout1;
-	wire mstrobe;
+	 wire mstrobe;
     adc_spi_monitor i_adc_mon (
         // Input clock,
         .clk    ( clk    ),
