@@ -44,6 +44,9 @@ module tt_um_pump_out(
 		// System
 		.clk			( clk ),
 		.reset 		( !rst_n ),
+		// Fpga monitors 
+		.fpga_probe ( ),
+		.fpga_probe2( ),
 		// Dig IO
 		.button		( ui_in[1]  ),
 		.setup_sw	( ui_in[4]  ),
