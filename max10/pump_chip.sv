@@ -204,10 +204,10 @@ module pump_chip
 	logic signed [11:0] sys_ct;
 	pump_model 
 	#(
-		.SP_STALL ( 12'sd1024 ),	// >= 15 amps rms
-		.SP_RUN 	 ( 12'sd666  ),	// typical 10 amps rms
-		.SP_EMPTY ( 12'sd500  ),	// empty say 9 amps rms
-		.SP_OFF	 ( 12'sd100 	 )		// Off still ac noise 0.1 amps rms
+		.SP_STALL ( 12'sd1103  ),	// >= 15 amps rms
+		.SP_RUN 	 ( 12'sd735   ),	// typical 10 amps rms
+		.SP_EMPTY ( 12'sd663   ),	// empty say 9 amps rms
+		.SP_OFF	 ( 12'sd7 	  )		// Off still ac noise 0.1 amps rms
 	) i_pump (
 		// System
 		.clk		( clk ),

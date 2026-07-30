@@ -7,10 +7,10 @@
 module pump_model 
 	#(
 
-		parameter SP_STALL 	= 12'sd1500 ,		// >= 15 amps rms
-		parameter SP_RUN 		= 12'sd1000 ,			// typical 10 amps rms
-		parameter SP_EMPTY 	= 12'sd900 ,		// empty say 9 amps rms
-		parameter SP_OFF		= 12'sd10 			// Off still ac noise 0.1 amps rms
+		parameter SP_STALL 	= 12'sd1103 ,		// >= 15 amps rms
+		parameter SP_RUN 		= 12'sd735  ,			// typical 10 amps rms
+		parameter SP_EMPTY 	= 12'sd663  ,		// empty say 9 amps rms
+		parameter SP_OFF		= 12'sd7 			// Off still ac noise 0.1 amps rms
 	) (
 		// System
 		input logic clk,
