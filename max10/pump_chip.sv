@@ -147,6 +147,8 @@ module pump_chip
 
 	logic [31:0] fpga_probe;	
 	logic [31:0] fpga_probe2;	
+	logic [11:0] fpga_probe3;	
+	
 
 	// Register ADC I/O
 		
@@ -213,6 +215,7 @@ module pump_chip
 		.clk		( clk ),
 		.reset	( reset ),
 		.tick		( sys_tick ),// 250ms in sim step time. 
+		.fpga_probe ( fpga_probe3 ),
 		.pump_out( 1'b1 ),//pump_out ),	// signal to turn on pump
 		.ct		( sys_ct ),	// range +/-2000 is +/-30 Amps isntantaneous (typicaol 10Amp RMS = +/-15Amps
 		.empty	( 1'b0 ), 	// change setpoint to empty current if not start current
@@ -297,11 +300,11 @@ module pump_chip
 	
 	// Scope monitor probes 
 	logic signed [4:0][11:0] probe;
-	assign probe[0] = dout0;
-	assign probe[1] = dout1;
-	assign probe[2] = rms_hold[0][30-:12];
+	assign probe[0] = dout0;	// pump ct wave
+	assign probe[1] = dout1;	// Ref
+	assign probe[2] = rms_hold[0][30-:12]; // RMS^2
 	assign probe[3] = rms_hold[1][30-:12];
-	assign probe[4] = fpga_probe[30-:12]; //dout0 >>> 1;
+	assign probe[4] = fpga_probe3; //dout0 >>> 1; probe3 is the model's live Scale factor, about 50% is 1:1
 
 	
 	//////////////////////////////

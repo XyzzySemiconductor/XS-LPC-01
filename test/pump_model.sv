@@ -24,7 +24,9 @@ module pump_model
 		// Fault inputs into Model:
 		input logic empty, 	// change setpoint to empty current if not start current
 		input logic stall, 	// change to the stall current (or keep it in stall after start)
-		input logic n_empty 	// change to the normal curretn (if not start current
+		input logic n_empty, 	// change to the normal curretn (if not start current
+		// Monitor output
+		output logic [11:0] fpga_probe
 	);
 	
   	/////////////////////
@@ -82,14 +84,22 @@ module pump_model
 	
 	// Most basic of behavior
 	// TODO add some slope to transistions
-	logic signed [11:0] ct_scale;
+	logic signed [11:0] ct_scale_sp;
 	logic signed [11:0] sp_auto;
-	assign ct_scale = ( !pump_out ) ? SP_OFF : ( empty ) ? SP_EMPTY : ( n_empty ) ? SP_RUN : ( stall ) ? SP_STALL : sp_auto;
+	logic signed [21:0] ct_scale;
+	assign ct_scale_sp = ( !pump_out ) ? SP_OFF : ( empty ) ? SP_EMPTY : ( n_empty ) ? SP_RUN : ( stall ) ? SP_STALL : sp_auto;
+	
+	// ct_scale goes to the setpoint by 1 each cycle
+	// moves at 800 stgeps pr 60 Hz cycle
+    always @(posedge clk) 	
+			ct_scale <= ( reset ) ? 0 : ( ct_scale[21-:12] < ct_scale_sp ) ? ct_scale + 1 :
+			                            ( ct_scale[21-:12] > ct_scale_sp ) ? ct_scale - 1 : ct_scale;
+	assign fpga_probe = ct_scale[21-:12];
 	
 	// Scale the sin3x output
 	logic signed [23:0] ct_rms;
     always @(posedge clk) 	
-		ct_rms <= ( ct_scale * cos3x ) >>> 10;
+		ct_rms <= (( ct_scale >>> 10 ) * cos3x ) >>> 10;
 	
 	assign ct[11:0] = { ct_rms[23], ct_rms[10:0] }; // scale can double teh +/-1544 sin. So max is 1.3 ish for this scale factor.
 	
@@ -97,10 +107,16 @@ module pump_model
 	// When turned on pump will ramp to stall==start current, for 1 sec
 	// then will fall to normal, for 10 sec (beyond the short cycle time
 	// then will fall to empty, until pump is turned off
+	logic [15:0] pump_time;
+   always @(posedge clk) 	
+		pump_time <= ( reset ) ? 0 : ( !pump_out ) ? 0 : ( tick ) ? pump_time + 1 : pump_time;
+		
+	assign sp_auto = 	( pump_time >= 1 && pump_time <= 4 	) ? SP_STALL :
+							( pump_time >  4 && pump_time <= 40 ) ? SP_RUN :
+							( pump_time > 40                    ) ? SP_EMPTY : SP_OFF;
 	
-	// for now, jsut run.
-	assign sp_auto = SP_RUN;
 	
+
 endmodule
 
 
