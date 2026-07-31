@@ -190,6 +190,15 @@ module pump_chip
   	//////////////////////
 
 	
+	// Test Inputs
+	always_comb begin
+		// Defautls
+		button = 1;
+		setup_sw = 1;
+		period_sw = 1;
+		timeout_sw = 1;
+	end
+	
 	/////////////////////
 	// Pump System Model
   	/////////////////////
@@ -206,17 +215,17 @@ module pump_chip
 	logic signed [11:0] sys_ct;
 	pump_model 
 	#(
-		.SP_STALL ( 12'sd1103  ),	// >= 15 amps rms
-		.SP_RUN 	 ( 12'sd735   ),	// typical 10 amps rms
-		.SP_EMPTY ( 12'sd663   ),	// empty say 9 amps rms
-		.SP_OFF	 ( 12'sd7 	  )		// Off still ac noise 0.1 amps rms
+		.SP_STALL ( 12'sd1200  ),	// >= 15 amps rms (1103)
+		.SP_RUN 	 ( 12'sd735   ),	// typical 10 amps rms (753)
+		.SP_EMPTY ( 12'sd600   ),	// empty under 9 amps rms (663)
+		.SP_OFF	 ( 12'sd7 	  )	// Off still ac noise 0.1 amps rms (7)
 	) i_pump (
 		// System
 		.clk		( clk ),
 		.reset	( reset ),
 		.tick		( sys_tick ),// 250ms in sim step time. 
 		.fpga_probe ( fpga_probe3 ),
-		.pump_out( 1'b1 ),//pump_out ),	// signal to turn on pump
+		.pump_out( pump_out ),	// signal to turn on pump
 		.ct		( sys_ct ),	// range +/-2000 is +/-30 Amps isntantaneous (typicaol 10Amp RMS = +/-15Amps
 		.empty	( 1'b0 ), 	// change setpoint to empty current if not start current
 		.stall	( 1'b0 ), 	// change to the stall current (or keep it in stall after start)
@@ -243,7 +252,7 @@ module pump_chip
         .ad_miso( adc_miso ),
         // ADC monitor outputs
         .din0( sys_ct ), // adc input signed for sim input
-        .din1( 900 ), // adc input signed for sim input
+        .din1( 663 ), // 663 for 9Amp
         .strb0( sstrb0 ), // indicateds data sampled
         .strb1( sstrb1 ) 
     );

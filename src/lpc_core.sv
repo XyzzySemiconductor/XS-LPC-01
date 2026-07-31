@@ -26,7 +26,7 @@ module lpc_core (
 );
    	// Physical parameters
 	parameter NUM_SAMPLE = 250 * 1; // samples to accumulate mult of 250 per 60hz cycle
-	parameter MAX_RMS 	 = 1544; 	// max RMS current
+	parameter MAX_RMS 	= 1103; 	// max RMS current
 
 	// TT tie-off (to be removed)
 	reg [15:0] xstate;
@@ -242,7 +242,7 @@ module lpc_core (
 	// Say pick the given Hz-ish range bit, ghiher and higher freq as the upper bits decrement
 	always @(posedge clk)
 		time_led <= ( reset ) ? 0 :
-					( setup_sw ) ?  win_cnt[win_cnt[18-:3]] : 
+					( setup_sw ) ?  win_cnt[~win_cnt[18-:3]] : 
 					( !setup_sw && !win_tick ) ? ct_lt_ref : time_led;
 	
 	// Over Current Logic
@@ -260,6 +260,30 @@ module lpc_core (
 		ovl_flag <= ( reset ) ? 0 : 
 					( !pump_out ) ? 0 :
 					(  pump_out && ovl_cnt == 15 && win_tick ) ? 1 : ovl_flag;
+	
+	// Timeout Logic
+	// timeout (3,6,12,24sec-ish), 
+	// Set at start of auto cycle
+	// count down win_ticks.
+	// Signal end when done.
+
+	logic [12:0] timesel;
+	assign timesel = 	( period_sw &&  timeout_sw ) ? 3*60*4 : // 3 min
+							(!period_sw &&  timeout_sw ) ? 6*60*4 : // 6 min
+							( period_sw && !timeout_sw ) ?12*60*4 : // 12 min
+																	24*60*4 ; // 24 min
+
+	logic [12:0] timeout_cnt;
+	always @(posedge clk) 
+		timeout_cnt <= ( reset ) ? 0 : 
+					( !pump_out ) ? 0 :
+					( win_tick && (timeout_cnt != timesel) ) ? timeout_cnt + 1 : timeout_cnt;
+
+	logic timeout;
+	always @(posedge clk) 
+		timeout  <= ( reset ) ? 0 : 
+					( !pump_out ) ? 0 :
+					( win_tick && ( timeout_cnt == timesel )) ? 1 : timeout;
 
 	// Low Current Logic
 	// 2 cycles (1/2sec) of under current triggers auto mode stop
@@ -272,32 +296,8 @@ module lpc_core (
 	always @(posedge clk) 
 		ufl_flag <= ( reset ) ? 0 : 
 					( !pump_out ) ? 0 :
-					( ltref_last && ct_lt_ref && win_tick ) ? 1 : ufl_flag;
-	
-	// Timeout Logic
-	// timeout (3,6,12,24sec-ish), 
-	// Set at start of auto cycle
-	// count down win_ticks.
-	// Signal end when done.
-
-	logic [10:0] timesel;
-	assign timesel = ( period_sw && timeout_sw ) ? 3*60*4 :
-					 ( !period_sw && timeout_sw ) ? 6*60*4 :
-					 ( period_sw && !timeout_sw ) ?12*60*4 : 24*60*4;
-
-	logic [10:0] timeout_cnt;
-	always @(posedge clk) 
-		timeout_cnt <= ( reset ) ? 0 : 
-					( !pump_out ) ? 0 :
-					( win_tick && timeout_cnt != timesel ) ? timeout_cnt + 1 : timeout_cnt;
-
-	logic timeout;
-	always @(posedge clk) 
-		timeout  <= ( reset ) ? 0 : 
-					( !pump_out ) ? 0 :
-					( win_tick && timeout_cnt == timesel ) ? 1 : ufl_flag;
-
-
+					( timeout_cnt >= 8 && ltref_last && ct_lt_ref && win_tick ) ? 1 : ufl_flag;
+					
 	// Pump Cycle Logic
 	// first rule, pump led follows pump output, 
     // Pump output is always on if button is pressed
@@ -331,11 +331,17 @@ module lpc_core (
  	// Turns off on low current (empty) (under current 1/2 sec), 
 	// or overcurrent (15Amp 4 sec-ish
 	// after finish the fault light signals last result run. blinks: 1-timeout, 2-overcurrent, none if low current (expected)
+	
+	// Auto start
+	logic [1:0] auto;
+	always @(posedge clk) 
+		auto <= ( reset ) ? 0 : ( setup_sw && auto == 3 ) ? 3 : ( setup_sw ) ? auto + 1 : 0;
     
 	// Pump Reg
 	always @(posedge clk) 
 		pump_out <= ( reset ) ? 0 :
 					( button_debounce ) ? 1 : 
+					( auto == 2 ) ? 1 : 
 					( !setup_sw && !button_debounce ) ? 0 :
 					( ovl_flag || ufl_flag || timeout ) ? 0 : pump_out;
 
