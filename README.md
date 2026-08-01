@@ -9,6 +9,12 @@
 - [documentation for forge production fpga](forge/forge.md)
 - [documentation for the Dev board PCB](pcb/pcb.md)
 
+Branches:
+- main - TT design forefront, and Max 10M25 fpga accel of full system sims with hdmi display.
+- lpc_emu - Max 10M04 fpga HW emulating the full TT chip (hdmi monitoring)
+- lpc_test - Max 10M04 system emulator, chip testing or emulator testing.
+- lpc_mon - Max 10M04 chip monitor, passive observation (hdmi)
+  
 ## What is Tiny Tapeout?
 
 Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
