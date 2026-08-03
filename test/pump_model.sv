@@ -87,7 +87,7 @@ module pump_model
 	logic signed [11:0] ct_scale_sp;
 	logic signed [11:0] sp_auto;
 	logic signed [21:0] ct_scale;
-	assign ct_scale_sp = ( !pump_out ) ? SP_OFF : ( empty ) ? SP_EMPTY : ( n_empty ) ? SP_RUN : ( stall ) ? SP_STALL : sp_auto;
+	assign ct_scale_sp = ( !pump_out ) ? SP_OFF : ( sp_auto == SP_STALL ) ? SP_STALL : ( empty ) ? SP_EMPTY : ( n_empty ) ? SP_RUN : ( stall ) ? SP_STALL : sp_auto;
 	
 	// ct_scale goes to the setpoint by 1 each cycle
 	// moves at 800 stgeps pr 60 Hz cycle
