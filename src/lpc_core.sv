@@ -269,8 +269,8 @@ module lpc_core (
 
 	logic [12:0] timesel;
 	assign timesel = 	( period_sw &&  timeout_sw ) ? 3*60*4 : // 3 min
-							(!period_sw &&  timeout_sw ) ? 6*60*4 : // 6 min
-							( period_sw && !timeout_sw ) ?12*60*4 : // 12 min
+							( period_sw && !timeout_sw ) ? 6*60*4 : // 6 min
+							(!period_sw &&  timeout_sw ) ?12*60*4 : // 12 min
 																	24*60*4 ; // 24 min
 
 	logic [12:0] timeout_cnt;
@@ -296,7 +296,18 @@ module lpc_core (
 	always @(posedge clk) 
 		ufl_flag <= ( reset ) ? 0 : 
 					( !pump_out ) ? 0 :
-					( timeout_cnt >= 8 && ltref_last && ct_lt_ref && win_tick ) ? 1 : ufl_flag;
+					( timeout_cnt >= 5 && ltref_last && ct_lt_ref && win_tick ) ? 1 : ufl_flag;
+					
+	// Short cycle / Empty fault
+	// Pumped for too short of time (~4sec)
+	// If we are not pumping at the 4 sec time after start. Its too short.
+	
+	logic short_cycle; // 
+	always @(posedge clk) 
+		short_cycle <= ( reset ) ? 0 :
+							( !pump_out ) ? 0 :
+							( pump_out && win_tick && timeout_cnt == 0 ) ? 1 : // assume it will be a short cycle
+							( pump_out && win_tick && timeout_cnt >= 16 ) ? 0 : short_cycle; // runnign and Timeout_cnt >= 4 sec, means we're not short cycled
 					
 	// Pump Cycle Logic
 	// first rule, pump led follows pump output, 
@@ -318,12 +329,13 @@ module lpc_core (
 					( pump_out ) ? 0 : // clear on pump on
 					( fault == 0 && ovl_flag ) ? 2 : // over current
 					( fault == 0 && timeout  ) ? 1  : // timeout
+					( fault == 0 && short_cycle ) ? 3 : // Empty tank
 								   fault;
 	always @(posedge clk) 
 		fault_led <= ( reset ) ? 0 : 
 					( !setup_sw ) ? ((win_tick) ? ct_lt_ref : fault_led) :
 					( pump_out ) ? 0 :
-					( fault != 0 && win_cnt[2:0] == 0 || fault == 2 && win_cnt[2:0] == 2 ) ? 1'b1 : 1'b0;
+					( fault != 0 && win_cnt[2:0] == 0 || fault >= 2 && win_cnt[2:0] == 2 || fault == 3 && win_cnt[2:0] == 4 ) ? 1'b1 : 1'b0;
 
 	// Auto mode
 	// In auto pump output is (re)started by pressing the button or 24hr ellapse
@@ -343,7 +355,7 @@ module lpc_core (
 					( button_debounce ) ? 1 : 
 					( auto == 2 ) ? 1 : 
 					( !setup_sw && !button_debounce ) ? 0 :
-					( ovl_flag || ufl_flag || timeout ) ? 0 : pump_out;
+					( ovl_flag || ufl_flag || timeout ) ? 0 : pump_out; // short_cycle specifically not in this list!
 
 	// Run Led follows pump output
 	always @(posedge clk)
