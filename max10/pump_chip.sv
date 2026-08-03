@@ -189,15 +189,36 @@ module pump_chip
   	/////////////////////
   	//////////////////////
 
+	// Model Inputs
+	logic empty, stall, n_empty;
 	
 	// Test Inputs
 	always_comb begin
-		// Defautls
+		// Defaut Nominal, Test 1
+		// Chip Inputs
 		button = 1;
 		setup_sw = 1;
-		period_sw = 1;
+		period_sw  = 1; 
 		timeout_sw = 1;
+		// Model Inputs
+		empty = 0;
+		stall = 0;
+		n_empty = 0;
+		
+		// Test 2, short cycle fault 
+		//empty = 1; // observed 3 blink fault code
+		
+		// Test 3, timeout fault
+		n_empty = 1; // observed 1 blink fault code
+		
+		// Test 4, stall over current fault test
+		//stall = 1; // Observed 2 blink fault code
+		
 	end
+	
+
+	
+	
 	
 	/////////////////////
 	// Pump System Model
@@ -227,9 +248,9 @@ module pump_chip
 		.fpga_probe ( fpga_probe3 ),
 		.pump_out( pump_out ),	// signal to turn on pump
 		.ct		( sys_ct ),	// range +/-2000 is +/-30 Amps isntantaneous (typicaol 10Amp RMS = +/-15Amps
-		.empty	( 1'b0 ), 	// change setpoint to empty current if not start current
-		.stall	( 1'b0 ), 	// change to the stall current (or keep it in stall after start)
-		.n_empty	( 1'b0 ) 	// change to the normal curretn (if not start current
+		.empty	( empty ), 	// change setpoint to empty current if not start current
+		.stall	( stall ), 	// change to the stall current (or keep it in stall after start)
+		.n_empty	( n_empty ) 	// change to the normal curretn (if not start current
 	);	
 	
 	
