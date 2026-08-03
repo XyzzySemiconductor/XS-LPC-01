@@ -75,7 +75,7 @@ module lpc_core (
 	
 	logic button_debounce; 
 	logic long_button;
-	forge_debounce #(48) i_bounc(.clk(clk),.reset(reset),.in(button),.out(button_debounce),.long(long_button));
+	forge_debounce #(48) i_bounc(.clk(clk),.reset(reset),.in(!button),.out(button_debounce),.long(long_button));
 
 	////////////////
     // RMS Compute

@@ -189,10 +189,26 @@ module pump_chip
   	/////////////////////
   	//////////////////////
 
+	/////////////
+	// Sim Time
+	/////////////
+	
+	// 4 Hz (or 60 Hz for 15x faster that realtime
+	logic [23:0] tick_cnt;
+	always_ff @(posedge clk) 
+		tick_cnt <= ( reset ) ? 0 : ( tick_cnt == (48000000 / 60) - 1 ) ? 0 : tick_cnt + 1;
+	logic sys_tick;
+	always_ff @(posedge clk) 
+		sys_tick <=  ( tick_cnt == (48000000 / 60) - 1 ) ? 1'b1 : 1'b0 ;	// 15x faster realtime
+		//tick <=  ( tick_cnt == (48000000 / 4 ) - 1 ) ? 1'b1 : 1'b0 ; 	// Realtime	
+	logic [19:0] time_cnt; // sim time count is count of tick's 
+	always_ff @(posedge clk) 
+		time_cnt <= ( reset ) ? 0 : ( tick_cnt == (48000000 / 60) - 1 ) ? time_cnt + 1 : time_cnt;
+	
 	// Model Inputs
 	logic empty, stall, n_empty;
 	
-	// Test Inputs
+	// Test Inputs driving.
 	always_comb begin
 		// Defaut Nominal, Test 1
 		// Chip Inputs
@@ -208,11 +224,15 @@ module pump_chip
 		// Test 2, short cycle fault 
 		//empty = 1; // observed 3 blink fault code
 		
-		// Test 3, timeout fault
-		n_empty = 1; // observed 1 blink fault code
+		// Test 3, timeout faults 
+		//n_empty = 1; // observed 1 blink fault code (3min, 6min, 12min, 24min each tested)
 		
 		// Test 4, stall over current fault test
 		//stall = 1; // Observed 2 blink fault code
+		
+		// Test 5: button restart
+		button = ( time_cnt == 64 ) ? 1'b0 : 1'b1;
+
 		
 	end
 	
@@ -224,14 +244,7 @@ module pump_chip
 	// Pump System Model
   	/////////////////////
 
-	// 4 Hz (or 60 Hz for 15x faster that realtime
-	logic [23:0] tick_cnt;
-	always_ff @(posedge clk) 
-		tick_cnt <= ( reset ) ? 0 : ( tick_cnt == (48000000 / 60) - 1 ) ? 0 : tick_cnt + 1;
-	logic sys_tick;
-	always_ff @(posedge clk) 
-		sys_tick <=  ( tick_cnt == (48000000 / 60) - 1 ) ? 1'b1 : 1'b0 ;	// 15x faster realtime
-		//tick <=  ( tick_cnt == (48000000 / 4 ) - 1 ) ? 1'b1 : 1'b0 ; 	// Realtime
+
 
 	logic signed [11:0] sys_ct;
 	pump_model 
