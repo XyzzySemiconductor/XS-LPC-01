@@ -231,8 +231,29 @@ module pump_chip
 		//stall = 1; // Observed 2 blink fault code
 		
 		// Test 5: button restart
-		button = ( time_cnt == 64 ) ? 1'b0 : 1'b1;
+		//button = ( 	time_cnt == 'h40 ) ? 1'b0 : 1'b1;
 
+		// Test 6: test sweep
+		// serially test all features. except setup
+		button = ( 								// Reset normal
+						time_cnt == 'h40 ||	// Button normal
+						time_cnt == 'h80 ||	// Button short cycle
+						time_cnt == 'hC0 ||	// Button over current
+						time_cnt == 'h100 ||	// Timeout 3 min
+						time_cnt == 'h500 ||	// Timeout 6 min
+						time_cnt == 'hC00 ||	// timeout 12 min
+						time_cnt == 'h1900 ||// Timeout 24 min
+						time_cnt == 'h3100 ||// Button Normal
+						time_cnt == 'h3140 	// Wait 24hr, and be a over current
+								) ? 1'b0 : 1'b1;
+		empty = ( time_cnt >= 'h80 && time_cnt < 'hc0 ) ? 1'b1 : 1'b0;
+		//stall = ( time_cnt >= 'hC0 && time_cnt < 'h100 || time_cnt >= 3140 ) ? 1'b1 : 1'b0;
+		stall = ( time_cnt >= 'hC0 && time_cnt < 'h100 ) ? 1'b1 : 1'b0;
+	
+		n_empty 		= ( time_cnt >= 'h100  && time_cnt <'h3100 ) ? 1'b1 : 1'b0;
+		timeout_sw 	= ( time_cnt >= 'h500  && time_cnt <'hc00 ||
+						    time_cnt >= 'h1900 && time_cnt <'h3100 ) ?1'b0 : 1'b1;
+		period_sw  	= ( time_cnt >= 'hC00  && time_cnt <'h3100 ) ?1'b0 : 1'b1;						  
 		
 	end
 	
