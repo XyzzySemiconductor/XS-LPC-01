@@ -132,17 +132,7 @@ module pump_chip
 	////
 	/////////////////////////////////
 	/////////////////////////////////
-	
-	// Wire up the inputs and outputs:
 
-	reg [7:0] ui_in;
-	reg [7:0] uio_in;
-	wire [7:0] uio_out;
-	wire [7:0] uio_oe;
-	wire [7:0] uo_out;
-
-	assign uio_in = 0; // tie off unused inputs
-	
   // Fpga probes
 
 	logic [31:0] fpga_probe;	
@@ -189,6 +179,7 @@ module pump_chip
   	/////////////////////
   	//////////////////////
 
+	logic [11:0] ref_in;
 	/////////////
 	// Sim Time
 	/////////////
@@ -211,6 +202,8 @@ module pump_chip
 	// Test Inputs driving.
 	always_comb begin
 		// Defaut Nominal, Test 1
+		// ADC Inptu
+		ref_in = 663; // 663 ~9A RMS
 		// Chip Inputs
 		button = 1;
 		setup_sw = 1;
@@ -235,25 +228,32 @@ module pump_chip
 
 		// Test 6: test sweep
 		// serially test all features. except setup
-		button = ( 								// Reset normal
-						time_cnt == 'h40 ||	// Button normal
-						time_cnt == 'h80 ||	// Button short cycle
-						time_cnt == 'hC0 ||	// Button over current
-						time_cnt == 'h100 ||	// Timeout 3 min
-						time_cnt == 'h500 ||	// Timeout 6 min
-						time_cnt == 'hC00 ||	// timeout 12 min
-						time_cnt == 'h1900 ||// Timeout 24 min
-						time_cnt == 'h3100 ||// Button Normal
-						time_cnt == 'h3140 	// Wait 24hr, and be a over current
-								) ? 1'b0 : 1'b1;
-		empty = ( time_cnt >= 'h80 && time_cnt < 'hc0 ) ? 1'b1 : 1'b0;
-		//stall = ( time_cnt >= 'hC0 && time_cnt < 'h100 || time_cnt >= 3140 ) ? 1'b1 : 1'b0;
-		stall = ( time_cnt >= 'hC0 && time_cnt < 'h100 ) ? 1'b1 : 1'b0;
-	
-		n_empty 		= ( time_cnt >= 'h100  && time_cnt <'h3100 ) ? 1'b1 : 1'b0;
-		timeout_sw 	= ( time_cnt >= 'h500  && time_cnt <'hc00 ||
-						    time_cnt >= 'h1900 && time_cnt <'h3100 ) ?1'b0 : 1'b1;
-		period_sw  	= ( time_cnt >= 'hC00  && time_cnt <'h3100 ) ?1'b0 : 1'b1;						  
+		//button = ( 								// Reset normal
+		//				time_cnt == 'h40 ||	// Button normal
+		//				time_cnt == 'h80 ||	// Button short cycle
+		//				time_cnt == 'hC0 ||	// Button over current
+		//				time_cnt == 'h100 ||	// Timeout 3 min
+		//				time_cnt == 'h500 ||	// Timeout 6 min
+		//				time_cnt == 'hC00 ||	// timeout 12 min
+		//				time_cnt == 'h1900 ||// Timeout 24 min
+		//				time_cnt == 'h3100 ||// Button Normal
+		//				time_cnt == 'h3140 	// Wait 24hr, and be a over current
+		//						) ? 1'b0 : 1'b1;
+		//empty = ( time_cnt >= 'h80 && time_cnt < 'hc0 ) ? 1'b1 : 1'b0;
+		////stall = ( time_cnt >= 'hC0 && time_cnt < 'h100 || time_cnt >= 3140 ) ? 1'b1 : 1'b0;
+		//stall = ( time_cnt >= 'hC0 && time_cnt < 'h100 ) ? 1'b1 : 1'b0;
+		//
+		//n_empty 		= ( time_cnt >= 'h100  && time_cnt <'h3100 ) ? 1'b1 : 1'b0;
+		//timeout_sw 	= ( time_cnt >= 'h500  && time_cnt <'hc00 ||
+		//				    time_cnt >= 'h1900 && time_cnt <'h3100 ) ?1'b0 : 1'b1;
+		//period_sw  	= ( time_cnt >= 'hC00  && time_cnt <'h3100 ) ?1'b0 : 1'b1;						  
+		
+		// Test 7 : setup, with ref ramp up/down while button pressed
+		button = ( time_cnt >= 1 && time_cnt < 80 ) ? 0 : 1;
+		ref_in = ( time_cnt >= 1 && time_cnt < 40 ) ? (time_cnt << 5) : 
+		         ( time_cnt >= 40 && time_cnt < 80 ) ? ((80-time_cnt)<<5) : 663;
+		setup_sw = 0;
+		n_empty = 1;
 		
 	end
 	
@@ -307,7 +307,7 @@ module pump_chip
         .ad_miso( adc_miso ),
         // ADC monitor outputs
         .din0( sys_ct ), // adc input signed for sim input
-        .din1( 663 ), // 663 for 9Amp
+        .din1( ref_in ), // 663 for 9Amp
         .strb0( sstrb0 ), // indicateds data sampled
         .strb1( sstrb1 ) 
     );
