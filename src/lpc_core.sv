@@ -74,8 +74,7 @@ module lpc_core (
 	////////////////
 	
 	logic button_debounce; 
-	logic long_button;
-	forge_debounce #(48) i_bounc(.clk(clk),.reset(reset),.in(!button),.out(button_debounce),.long(long_button));
+	forge_debounce #(48) i_bounc(.clk(clk),.reset(reset),.in(!button),.out(button_debounce),.out_pulse(),.long());
 
 	////////////////
     // RMS Compute
@@ -243,7 +242,7 @@ module lpc_core (
 	always @(posedge clk)
 		time_led <= ( reset ) ? 0 :
 					( setup_sw ) ?  win_cnt[~win_cnt[18-:3]] : 
-					( !setup_sw && !win_tick ) ? ct_lt_ref : time_led;
+					( !setup_sw && win_tick ) ? !ct_lt_ref : time_led;
 	
 	// Over Current Logic
 	// 4 sec 15amp
@@ -367,7 +366,8 @@ module forge_debounce(
     input clk,
     input reset,
     input in,
-    output out, // fixed pulse 15ms after 5ms pressure
+    output out_pulse, // fixed pulse 15ms after 5ms pressure
+	 output out, // Follow input with asymetric 5/100 debouncing
     output long // after fire held for > 2/3 sec, until release
     );
 
@@ -409,7 +409,8 @@ module forge_debounce(
         end
     end
 
-    assign out = (state == S_WAIT_PULSE) ? 1'b1 : 1'b0;
+    assign out_pulse = (state == S_WAIT_PULSE) ? 1'b1 : 1'b0;
+	 assign out = ( state != S_IDLE && state != S_WAIT_PRESS ) ? 1'b1 : 1'b0;
     assign long = (state == S_LONG || state == S_WAIT_LOFF) ? 1'b1 : 1'b0;
 
     // Counters
