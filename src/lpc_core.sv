@@ -234,7 +234,7 @@ module lpc_core (
 	always @(posedge clk)
 		win_cnt <= 	( reset ) ? 0 : 
 					( button_debounce || pump_out ) ? 0 : 
-                   	( win_tick && win_cnt == 19'h54600 ) ? 0 : 
+               ( win_tick && ( win_cnt == (19'h54600 - 1 ))) ? 0 : 
 					( win_tick ) ? win_cnt + 1 : win_cnt;
 	
 	// Modulate life led based on 24hr countdown (fast as time gets closer)
@@ -352,8 +352,9 @@ module lpc_core (
 	always @(posedge clk) 
 		pump_out <= ( reset ) ? 0 :
 					( button_debounce ) ? 1 : 
-					( auto == 2 ) ? 1 : 
 					( !setup_sw && !button_debounce ) ? 0 :
+					( auto == 2 ) ? 1 : 
+					( win_tick && ( win_cnt == (19'h54600 - 1 ))) ? 1 :
 					( ovl_flag || ufl_flag || timeout ) ? 0 : pump_out; // short_cycle specifically not in this list!
 
 	// Run Led follows pump output
