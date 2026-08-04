@@ -116,14 +116,14 @@ module pump_chip
 
 
 	// AIN LED Display with counter
-	assign anain[4:1] = { button, setup_sw, period_sw, timeout_sw }; // active low switch inputs
+	assign anain[4:1] = ~{ time_led, fault_led, run_led, pump_out }; // active low leds
 
 	logic [24:0] count;
 	always @(posedge clk) begin
 		count <= count + 1;
 	end
-	assign anain[8:5] = count[24:21];
-	assign anain[8]=count[24];
+	assign anain[8:5] = 3'b111; //count[24:21];
+
 
 	/////////////////////////////////
 	/////////////////////////////////
@@ -227,7 +227,7 @@ module pump_chip
 		//button = ( 	time_cnt == 'h40 ) ? 1'b0 : 1'b1;
 
 		// Test 6: test sweep
-		// serially test all features. except setup
+		// serially test all features. except setup and 24hr
 		//button = ( 								// Reset normal
 		//				time_cnt == 'h40 ||	// Button normal
 		//				time_cnt == 'h80 ||	// Button short cycle
@@ -249,11 +249,16 @@ module pump_chip
 		//period_sw  	= ( time_cnt >= 'hC00  && time_cnt <'h3100 ) ?1'b0 : 1'b1;						  
 		
 		// Test 7 : setup, with ref ramp up/down while button pressed
-		button = ( time_cnt >= 1 && time_cnt < 80 ) ? 0 : 1;
-		ref_in = ( time_cnt >= 1 && time_cnt < 40 ) ? (time_cnt << 5) : 
-		         ( time_cnt >= 40 && time_cnt < 80 ) ? ((80-time_cnt)<<5) : 663;
-		setup_sw = 0;
-		n_empty = 1;
+		//button = ( time_cnt >= 1 && time_cnt < 80 ) ? 0 : 1;
+		//ref_in = ( time_cnt >= 1 && time_cnt < 40 ) ? (time_cnt << 5) : 
+		//         ( time_cnt >= 40 && time_cnt < 80 ) ? ((80-time_cnt)<<5) : 663;
+		//setup_sw = 0;
+		//n_empty = 1;
+		
+		//Test 8: 24hr test. 
+		//Pump om power up, set it to timeout (3min)
+		n_empty = ( time_cnt >= 'h40 ) ? 1 : 0;
+
 		
 	end
 	
