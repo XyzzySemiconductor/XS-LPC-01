@@ -267,9 +267,9 @@ module lpc_core (
 	// Signal end when done.
 
 	logic [12:0] timesel;
-	assign timesel = 	( period_sw &&  timeout_sw ) ? 3*60*4 : // 3 min
-							( period_sw && !timeout_sw ) ? 6*60*4 : // 6 min
-							(!period_sw &&  timeout_sw ) ?12*60*4 : // 12 min
+	assign timesel = 	( period_sw && !timeout_sw ) ? 3*60*4 : // 3 min
+							( period_sw &&  timeout_sw ) ? 6*60*4 : // 6 min
+							(!period_sw && !timeout_sw ) ?12*60*4 : // 12 min
 																	24*60*4 ; // 24 min
 
 	logic [12:0] timeout_cnt;

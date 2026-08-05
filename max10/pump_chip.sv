@@ -208,7 +208,7 @@ module pump_chip
 		button = 1;
 		setup_sw = 1;
 		period_sw  = 1; 
-		timeout_sw = 1;
+		timeout_sw = 0;  /// default 3 min
 		// Model Inputs
 		empty = 0;
 		stall = 0;
@@ -228,25 +228,25 @@ module pump_chip
 
 		// Test 6: test sweep
 		// serially test all features. except setup and 24hr
-		//button = ( 								// Reset normal
-		//				time_cnt == 'h40 ||	// Button normal
-		//				time_cnt == 'h80 ||	// Button short cycle
-		//				time_cnt == 'hC0 ||	// Button over current
-		//				time_cnt == 'h100 ||	// Timeout 3 min
-		//				time_cnt == 'h500 ||	// Timeout 6 min
-		//				time_cnt == 'hC00 ||	// timeout 12 min
-		//				time_cnt == 'h1900 ||// Timeout 24 min
-		//				time_cnt == 'h3100 ||// Button Normal
-		//				time_cnt == 'h3140 	// Wait 24hr, and be a over current
-		//						) ? 1'b0 : 1'b1;
-		//empty = ( time_cnt >= 'h80 && time_cnt < 'hc0 ) ? 1'b1 : 1'b0;
-		////stall = ( time_cnt >= 'hC0 && time_cnt < 'h100 || time_cnt >= 3140 ) ? 1'b1 : 1'b0;
-		//stall = ( time_cnt >= 'hC0 && time_cnt < 'h100 ) ? 1'b1 : 1'b0;
-		//
-		//n_empty 		= ( time_cnt >= 'h100  && time_cnt <'h3100 ) ? 1'b1 : 1'b0;
-		//timeout_sw 	= ( time_cnt >= 'h500  && time_cnt <'hc00 ||
-		//				    time_cnt >= 'h1900 && time_cnt <'h3100 ) ?1'b0 : 1'b1;
-		//period_sw  	= ( time_cnt >= 'hC00  && time_cnt <'h3100 ) ?1'b0 : 1'b1;						  
+		button = ( 								// Reset normal
+						time_cnt == 'h80 ||	// Button normal
+						time_cnt == 'h100 ||	// Button short cycle
+						time_cnt == 'h180 ||	// Button over current
+						time_cnt == 'h200 ||	// Timeout 3 min
+						time_cnt == 'h600 ||	// Timeout 6 min
+						time_cnt == 'hD00 ||	// timeout 12 min
+						time_cnt == 'h1A00 ||// Timeout 24 min
+						time_cnt == 'h3200 ||// Button Normal
+						time_cnt == 'h3240 	// Wait 24hr, and be a over current
+								) ? 1'b0 : 1'b1;
+		empty = ( time_cnt >= 'h100 && time_cnt < 'h180 ) ? 1'b1 : 1'b0;
+		//stall = ( time_cnt >= 'hC0 && time_cnt < 'h200 || time_cnt >= 3240 ) ? 1'b1 : 1'b0;
+		stall = ( time_cnt >= 'h180 && time_cnt < 'h200 ) ? 1'b1 : 1'b0;
+		
+		n_empty 		= ( time_cnt >= 'h200  && time_cnt <'h3200 ) ? 1'b1 : 1'b0;
+		timeout_sw 	= ( time_cnt >= 'h200  && time_cnt <'h600 ||
+						    time_cnt >= 'hD00  && time_cnt <'h1A00 ) ?1'b0 : 1'b1;
+		period_sw  	= ( time_cnt >= 'hD00  && time_cnt <'h3200 ) ?1'b0 : 1'b1;						  
 		
 		// Test 7 : setup, with ref ramp up/down while button pressed
 		//button = ( time_cnt >= 1 && time_cnt < 80 ) ? 0 : 1;
@@ -257,7 +257,7 @@ module pump_chip
 		
 		//Test 8: 24hr test. 
 		//Pump om power up, set it to timeout (3min)
-		n_empty = ( time_cnt >= 'h40 ) ? 1 : 0;
+		//n_empty = ( time_cnt >= 'h40 ) ? 1 : 0;
 
 		
 	end
