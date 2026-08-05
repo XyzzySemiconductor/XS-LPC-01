@@ -1,3 +1,4 @@
+// vim: ts=4:
 // A plant model of the pump and system for simulation
 // In this case it is for runnig on the MAX 10 simulation accelerator, so is synthesizable.
 // Tests run externally, and feed parameters to the model which is active whenever pump_out = 1;
@@ -8,9 +9,9 @@ module pump_model
 	#(
 
 		parameter SP_STALL 	= 12'sd1103 ,		// >= 15 amps rms
-		parameter SP_RUN 		= 12'sd735  ,			// typical 10 amps rms
+		parameter SP_RUN 	= 12'sd735  ,			// typical 10 amps rms
 		parameter SP_EMPTY 	= 12'sd663  ,		// empty say 9 amps rms
-		parameter SP_OFF		= 12'sd7 			// Off still ac noise 0.1 amps rms
+		parameter SP_OFF	= 12'sd7 			// Off still ac noise 0.1 amps rms
 	) (
 		// System
 		input logic clk,
@@ -112,8 +113,8 @@ module pump_model
 		pump_time <= ( reset ) ? 0 : ( !pump_out ) ? 0 : ( tick ) ? pump_time + 1 : pump_time;
 		
 	assign sp_auto = 	( pump_time >= 1 && pump_time <= 4 	) ? SP_STALL :
-							( pump_time >  4 && pump_time <= 40 ) ? SP_RUN :
-							( pump_time > 40                    ) ? SP_EMPTY : SP_OFF;
+						( pump_time >  4 && pump_time <= 40 ) ? SP_RUN :
+						( pump_time > 40                    ) ? SP_EMPTY : SP_OFF;
 	
 	
 

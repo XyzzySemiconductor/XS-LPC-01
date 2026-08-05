@@ -1,7 +1,11 @@
 // vim: ts=4:
 // The LPC Core.
 // Wrapped by chip specific warapepr (ie project.,v)
-module lpc_core (
+module lpc_core # (
+   	// Physical parametersdd
+	parameter NUM_SAMPLE = 250, // 3750 for real time, 250 for 16x
+	parameter MAX_RMS 	 = 1103 // max 15A RMS = 1103 current threshold
+) (
 	// System
 	input logic clk,
 	input logic reset,
@@ -24,16 +28,7 @@ module lpc_core (
 	output logic adc_mosi,  // shift data input to adc
 	 input logic adc_miso 	// shift data output from adc
 );
-   	// Physical parameters
-	parameter NUM_SAMPLE = 250 * 1; // samples to accumulate mult of 250 per 60hz cycle
-	parameter MAX_RMS 	= 1103; 	// max RMS current
 
-	// TT tie-off (to be removed)
-	reg [15:0] xstate;
-	always_ff @(posedge clk) 
-		xstate <= ( reset ) ? 0 : xstate + &{ clk, reset, button, period_sw, timeout_sw, setup_sw, adc_miso };
-	//assign { time_led, fault_led, run_led, pump_out } = xstate;
-    
 	////////////////
     // ADC inteface
 	////////////////
@@ -239,9 +234,17 @@ module lpc_core (
 	
 	// Modulate life led based on 24hr countdown (fast as time gets closer)
 	// Say pick the given Hz-ish range bit, ghiher and higher freq as the upper bits decrement
+	logic [5:0] toggle;
+	assign toggle = ( NUM_SAMPLE == 3750 ) ? { win_cnt[3-:4], sample_count[11-:2] } :
+					( NUM_SAMPLE == 250  ) ? win_cnt[7-:6] : 8'b0 ;
 	always @(posedge clk)
 		time_led <= ( reset ) ? 0 :
-					( setup_sw ) ?  win_cnt[~win_cnt[18-:3]] : 
+					( setup_sw && win_cnt[18-:3] == 0 ) ? toggle[5] :
+					( setup_sw && win_cnt[18-:3] == 1 ) ? toggle[4] :
+					( setup_sw && win_cnt[18-:3] == 2 ) ? toggle[3] :
+					( setup_sw && win_cnt[18-:3] == 3 ) ? toggle[2] :
+					( setup_sw && win_cnt[18-:3] == 4 ) ? toggle[1] :
+					( setup_sw && win_cnt[18-:3] == 5 ) ? toggle[0] :
 					( !setup_sw && win_tick ) ? !ct_lt_ref : time_led;
 	
 	// Over Current Logic

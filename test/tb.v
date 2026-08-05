@@ -68,8 +68,8 @@ module tb ();
 		tick_cnt <= ( !rst_n ) ? 0 : ( tick_cnt == (48000000 / 60) - 1 ) ? 0 : tick_cnt + 1;
 	reg sys_tick;
 	always_ff @(posedge clk) 
-		sys_tick <=  ( tick_cnt == (48000000 / 60) - 1 ) ? 1'b1 : 1'b0 ;	// 15x faster realtime
-		//tick <=  ( tick_cnt == (48000000 / 4 ) - 1 ) ? 1'b1 : 1'b0 ; 	// Realtime
+		//sys_tick <=  ( tick_cnt == (48000000 / 60) - 1 ) ? 1'b1 : 1'b0 ;	// 15x faster realtime
+		sys_tick <=  ( tick_cnt == (48000000 / 4 ) - 1 ) ? 1'b1 : 1'b0 ; 	// Realtime
 
 	wire signed [11:0] sys_ct;
 	pump_model 
@@ -82,6 +82,7 @@ module tb ();
 		// System
 		.clk		( clk ),
 		.reset	( !rst_n ),
+		.fpga_probe ( ),
 		.tick		( sys_tick ),// 250ms in sim step time. 
 		.pump_out( 1'b1 ),//pump_out ),	// signal to turn on pump
 		.ct		( sys_ct ),	// range +/-2000 is +/-30 Amps isntantaneous (typicaol 10Amp RMS = +/-15Amps

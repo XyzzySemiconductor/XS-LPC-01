@@ -19,7 +19,7 @@ module tt_um_pump_out(
 
   // All output pins must be assigned. If not used, assign to 0.
   assign uo_out[7] = 0; 
-  assign uio_out = 0;
+  //assign uio_out = 0;
   assign uio_oe  = 0;
 
   // List all unused inputs to prevent warnings
@@ -40,9 +40,13 @@ module tt_um_pump_out(
 	
 	// Instantate and connect core logic to the TT I/O
 
-	lpc_core i_core (
+	localparam REALTIME = 3750;
+	assign uio_out[7:0] = ( REALTIME >> 4 ); // So we can check it in TB
+	lpc_core #(
+		.NUM_SAMPLE( REALTIME )  // TT Is always real time 3750
+	) i_core (
 		// System
-		.clk			( clk ),
+		.clk		( clk  ),
 		.reset 		( !rst_n ),
 		// Fpga monitors 
 		.fpga_probe ( ),

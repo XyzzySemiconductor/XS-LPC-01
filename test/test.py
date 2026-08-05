@@ -30,8 +30,17 @@ async def test_project(dut):
     # dut.uio_in.value = 30
 
     # Wait for one clock cycle to see the output values
+    assert dut.uio_out.value == (3750>>4)
+    assert int(dut.user_project.i_core.rms_hold_ct.value) == 0
+    assert int(dut.user_project.i_core.rms_hold_ct.value) == 0
     dut._log.info("60 Hz cycle")
-    await ClockCycles(dut.clk, 50000 * 16 + 3200 * 10 )
+    #await ClockCycles(dut.clk, 50000 * 16 + 3200 * 10 )
+    await ClockCycles(dut.clk, 50000 * 16 * 16)
+    # check RMS values
+    assert int(dut.user_project.i_core.rms_hold_ct.value) < (1200*1200*3750)
+    assert int(dut.user_project.i_core.rms_hold_ct.value) > (1000*1000*3750)
+    assert int(dut.user_project.i_core.rms_hold_ref.value) < (600*600*3750)
+    assert int(dut.user_project.i_core.rms_hold_ref.value) > (500*500*3750)
 
     # The following assersion is just an example of how to check the output values.
     # Change it to match the actual expected output of your module:
