@@ -112,7 +112,7 @@ module pump_model
    always @(posedge clk) 	
 		pump_time <= ( reset ) ? 0 : ( !pump_out ) ? 0 : ( tick ) ? pump_time + 1 : pump_time;
 		
-	assign sp_auto = 	( pump_time >= 1 && pump_time <= 4 	) ? SP_STALL :
+	assign sp_auto = 	( pump_out && pump_time <= 4 	) ? SP_STALL :
 						( pump_time >  4 && pump_time <= 40 ) ? SP_RUN :
 						( pump_time > 40                    ) ? SP_EMPTY : SP_OFF;
 	
