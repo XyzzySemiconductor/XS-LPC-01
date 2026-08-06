@@ -39,8 +39,9 @@ async def test_project(dut):
 
     # Wait for one clock cycle to see the output values
     assert dut.uio_out.value == (3750>>4)
-    assert int(dut.user_project.i_core.rms_hold_ct.value) == 0
-    assert int(dut.user_project.i_core.rms_hold_ct.value) == 0
+    if not GL_MODE:
+        assert int(dut.user_project.i_core.rms_hold_ct.value) == 0
+        assert int(dut.user_project.i_core.rms_hold_ct.value) == 0
     dut._log.info("60 Hz cycle")
     if GL_MODE:
         await ClockCycles(dut.clk, 50000 * 16 + 3200 * 10 )
