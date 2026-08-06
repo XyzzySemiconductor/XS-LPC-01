@@ -149,7 +149,11 @@ module pump_chip
 	always @(posedge clk) miso_io <= adc_miso; 
 	
 	// PUMP Chip CORE emulation/test
-  lpc_core i_core (
+	localparam NUM_SAMPLE = 3750;//250; // // 3750 is realtime, 250 is 15x realtime
+	lpc_core #(
+		.NUM_SAMPLE( NUM_SAMPLE ), 
+		.MAX_RMS( 1103 ) // 15 amps
+	) i_core (
 		// System
 		.clk			( clk ),
 		.reset 		( reset ),
@@ -186,15 +190,19 @@ module pump_chip
 	
 	// 4 Hz (or 60 Hz for 15x faster that realtime
 	logic [23:0] tick_cnt;
-	always_ff @(posedge clk) 
-		tick_cnt <= ( reset ) ? 0 : ( tick_cnt == (48000000 / 60) - 1 ) ? 0 : tick_cnt + 1;
 	logic sys_tick;
-	always_ff @(posedge clk) 
-		sys_tick <=  ( tick_cnt == (48000000 / 60) - 1 ) ? 1'b1 : 1'b0 ;	// 15x faster realtime
-		//tick <=  ( tick_cnt == (48000000 / 4 ) - 1 ) ? 1'b1 : 1'b0 ; 	// Realtime	
 	logic [19:0] time_cnt; // sim time count is count of tick's 
+
 	always_ff @(posedge clk) 
-		time_cnt <= ( reset ) ? 0 : ( tick_cnt == (48000000 / 60) - 1 ) ? time_cnt + 1 : time_cnt;
+		if( NUM_SAMPLE == 250 ) begin
+			tick_cnt <= ( reset ) ? 0 : ( tick_cnt == (48000000 / 60) - 1 ) ? 0 : tick_cnt + 1;
+			sys_tick <=  ( tick_cnt == (48000000 / 60) - 1 ) ? 1'b1 : 1'b0 ;	// 15x faster realtime
+			time_cnt <= ( reset ) ? 0 : ( tick_cnt == (48000000 / 60) - 1 ) ? time_cnt + 1 : time_cnt;
+		end else begin
+			tick_cnt <= ( reset ) ? 0 : ( tick_cnt == (48000000 / 4) - 1 ) ? 0 : tick_cnt + 1;
+		   sys_tick <=  ( tick_cnt == (48000000 / 4 ) - 1 ) ? 1'b1 : 1'b0 ; 	// Realtime	
+			time_cnt <= ( reset ) ? 0 : ( tick_cnt == (48000000 / 4) - 1 ) ? time_cnt + 1 : time_cnt;
+		end
 	
 	// Model Inputs
 	logic empty, stall, n_empty;
@@ -228,25 +236,25 @@ module pump_chip
 
 		// Test 6: test sweep
 		// serially test all features. except setup and 24hr
-		button = ( 								// Reset normal
-						time_cnt == 'h80 ||	// Button normal
-						time_cnt == 'h100 ||	// Button short cycle
-						time_cnt == 'h180 ||	// Button over current
-						time_cnt == 'h200 ||	// Timeout 3 min
-						time_cnt == 'h600 ||	// Timeout 6 min
-						time_cnt == 'hD00 ||	// timeout 12 min
-						time_cnt == 'h1A00 ||// Timeout 24 min
-						time_cnt == 'h3200 ||// Button Normal
-						time_cnt == 'h3240 	// Wait 24hr, and be a over current
-								) ? 1'b0 : 1'b1;
-		empty = ( time_cnt >= 'h100 && time_cnt < 'h180 ) ? 1'b1 : 1'b0;
-		//stall = ( time_cnt >= 'hC0 && time_cnt < 'h200 || time_cnt >= 3240 ) ? 1'b1 : 1'b0;
-		stall = ( time_cnt >= 'h180 && time_cnt < 'h200 ) ? 1'b1 : 1'b0;
-		
-		n_empty 		= ( time_cnt >= 'h200  && time_cnt <'h3200 ) ? 1'b1 : 1'b0;
-		timeout_sw 	= ( time_cnt >= 'h200  && time_cnt <'h600 ||
-						    time_cnt >= 'hD00  && time_cnt <'h1A00 ) ?1'b0 : 1'b1;
-		period_sw  	= ( time_cnt >= 'hD00  && time_cnt <'h3200 ) ?1'b0 : 1'b1;						  
+		//button = ( 								// Reset normal
+		//				time_cnt == 'h80 ||	// Button normal
+		//				time_cnt == 'h100 ||	// Button short cycle
+		//				time_cnt == 'h180 ||	// Button over current
+		//				time_cnt == 'h200 ||	// Timeout 3 min
+		//				time_cnt == 'h600 ||	// Timeout 6 min
+		//				time_cnt == 'hD00 ||	// timeout 12 min
+		//				time_cnt == 'h1A00 ||// Timeout 24 min
+		//				time_cnt == 'h3200 ||// Button Normal
+		//				time_cnt == 'h3240 	// Wait 24hr, and be a over current
+		//						) ? 1'b0 : 1'b1;
+		//empty = ( time_cnt >= 'h100 && time_cnt < 'h180 ) ? 1'b1 : 1'b0;
+		////stall = ( time_cnt >= 'hC0 && time_cnt < 'h200 || time_cnt >= 3240 ) ? 1'b1 : 1'b0;
+		//stall = ( time_cnt >= 'h180 && time_cnt < 'h200 ) ? 1'b1 : 1'b0;
+		//
+		//n_empty 		= ( time_cnt >= 'h200  && time_cnt <'h3200 ) ? 1'b1 : 1'b0;
+		//timeout_sw 	= ( time_cnt >= 'h200  && time_cnt <'h600 ||
+		//				    time_cnt >= 'hD00  && time_cnt <'h1A00 ) ?1'b0 : 1'b1;
+		//period_sw  	= ( time_cnt >= 'hD00  && time_cnt <'h3200 ) ?1'b0 : 1'b1;						  
 		
 		// Test 7 : setup, with ref ramp up/down while button pressed
 		//button = ( time_cnt >= 1 && time_cnt < 80 ) ? 0 : 1;
@@ -257,7 +265,7 @@ module pump_chip
 		
 		//Test 8: 24hr test. 
 		//Pump om power up, set it to timeout (3min)
-		//n_empty = ( time_cnt >= 'h40 ) ? 1 : 0;
+		n_empty = ( time_cnt >= 'h40 ) ? 1 : 0;
 
 		
 	end
