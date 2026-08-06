@@ -33,6 +33,12 @@ module tb ();
 	assign ad_ncs = uo_out[0];
 	assign ad_clk = uo_out[1];
 	assign ad_mosi= uo_out[2];
+	wire pump_out, time_led, fault_led, run_led;
+	assign time_led = uo_out[3];
+	assign fault_led= uo_out[4];
+	assign run_led 	= uo_out[5];
+	assign pump_out = uo_out[6];
+
 
   	// Replace tt_um_example with your module name:
   	tt_um_pump_out user_project (
@@ -74,20 +80,20 @@ module tb ();
 	wire signed [11:0] sys_ct;
 	pump_model 
 	#(
-		.SP_STALL ( 12'sd1024 ),	// >= 15 amps rms
-		.SP_RUN 	 ( 12'sd666  ),	// typical 10 amps rms
-		.SP_EMPTY ( 12'sd500  ),	// empty say 9 amps rms
-		.SP_OFF	 ( 12'sd100 	 )		// Off still ac noise 0.1 amps rms
+		.SP_STALL( 12'sd1024 ),	// >= 15 amps rms
+		.SP_RUN  ( 12'sd666  ),	// typical 10 amps rms
+		.SP_EMPTY( 12'sd500  ),	// empty say 9 amps rms
+		.SP_OFF	 ( 12'sd100	 )		// Off still ac noise 0.1 amps rms
 	) i_pump (
 		// System
 		.clk		( clk ),
-		.reset	( !rst_n ),
+		.reset		( !rst_n ),
 		.fpga_probe ( ),
 		.tick		( sys_tick ),// 250ms in sim step time. 
-		.pump_out( 1'b1 ),//pump_out ),	// signal to turn on pump
-		.ct		( sys_ct ),	// range +/-2000 is +/-30 Amps isntantaneous (typicaol 10Amp RMS = +/-15Amps
-		.empty	( 1'b0 ), 	// change setpoint to empty current if not start current
-		.stall	( 1'b1 ), 	// change to the stall current (or keep it in stall after start)
+		.pump_out	( pump_out ),	// signal to turn on pump
+		.ct			( sys_ct ),	// range +/-2000 is +/-30 Amps isntantaneous (typicaol 10Amp RMS = +/-15Amps
+		.empty		( 1'b0 ), 	// change setpoint to empty current if not start current
+		.stall		( 1'b1 ), 	// change to the stall current (or keep it in stall after start)
 		.n_empty	( 1'b0 ) 	// change to the normal curretn (if not start current
 	);	
 	

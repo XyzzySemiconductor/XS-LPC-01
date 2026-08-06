@@ -23,6 +23,14 @@ async def test_project(dut):
     await ClockCycles(dut.clk, 10)
     dut.rst_n.value = 1
 
+    try:
+        _ = dut.user_project.i_core.rms_hold_ct.value
+        GL_MODE = False
+        dut._log.info("RTL Sim")
+    except AttributeError:
+        GL_MODE = True
+        dut._log.info("Gate Sim")
+
     dut._log.info("Test project behavior")
 
     # Set the input values you want to test
@@ -34,13 +42,21 @@ async def test_project(dut):
     assert int(dut.user_project.i_core.rms_hold_ct.value) == 0
     assert int(dut.user_project.i_core.rms_hold_ct.value) == 0
     dut._log.info("60 Hz cycle")
-    #await ClockCycles(dut.clk, 50000 * 16 + 3200 * 10 )
-    await ClockCycles(dut.clk, 50000 * 16 * 16)
+    if GL_MODE:
+        await ClockCycles(dut.clk, 50000 * 16 + 3200 * 10 )
+    if not GL_MODE:
+        await ClockCycles(dut.clk, 50000 * 16 * 16)
+    #check that flags are OK (and not X)
+    assert dut.pump_out.value  == 1
+    assert dut.time_led.value  == 1
+    assert dut.fault_led.value == 0
+    assert dut.run_led.value   == 1
     # check RMS values
-    assert int(dut.user_project.i_core.rms_hold_ct.value) < (1200*1200*3750)
-    assert int(dut.user_project.i_core.rms_hold_ct.value) > (1000*1000*3750)
-    assert int(dut.user_project.i_core.rms_hold_ref.value) < (600*600*3750)
-    assert int(dut.user_project.i_core.rms_hold_ref.value) > (500*500*3750)
+    if not GL_MODE:
+        assert int(dut.user_project.i_core.rms_hold_ct.value) < (1200*1200*3750)
+        assert int(dut.user_project.i_core.rms_hold_ct.value) > (1000*1000*3750)
+        assert int(dut.user_project.i_core.rms_hold_ref.value) < (600*600*3750)
+        assert int(dut.user_project.i_core.rms_hold_ref.value) > (500*500*3750)
 
     # The following assersion is just an example of how to check the output values.
     # Change it to match the actual expected output of your module:
