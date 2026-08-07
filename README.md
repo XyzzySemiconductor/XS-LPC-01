@@ -2,6 +2,9 @@
 
 # Tiny Tapeout Project: Liquid Pump Controller
 
+A digital control chip to daily pump a tank empty. Approached as system design  for a whole product, of which the chip is the core but not only design work required.
+
+
 - [chip datasheet](docs/LPC_Datasheet.pdf)
 - [documentation for Tiny Tapeout chip](docs/info.md)
 - [documentation for Tiny Tapeout tests](test/README.md)
