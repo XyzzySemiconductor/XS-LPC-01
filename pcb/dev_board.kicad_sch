@@ -2,12 +2,12 @@
 
   (uuid 91657278-176c-4c3c-b7c8-7fab77e89520)
 
-  (paper "A")
+  (paper "E")
 
   (title_block
     (title "XS-LPC-DB Development Board")
     (date "2026-07-10")
-    (rev "v0.5")
+    (rev "v0.5.1")
     (company "Eric Pearson, XYZZY Semiconductor")
   )
 
@@ -1939,7 +1939,6 @@
     )
   )
 
-
   (junction (at 124.46 117.475) (diameter 0) (color 0 0 0 0)
     (uuid 031b829b-1e93-4b6a-969e-6cbff82f8d54)
   )
@@ -2965,7 +2964,7 @@
     (effects (font (size 1.27 1.27)) (justify right bottom))
     (uuid 59ef3d73-8303-4e8f-98cb-c87c372932e4)
   )
-  (label "run_led" (at 106.68 55.88 0) (fields_autoplaced)
+  (label "time_led" (at 106.68 55.88 0) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 5c4083d9-c8c4-4f23-83b0-8cc28d00484e)
   )
@@ -2977,7 +2976,7 @@
     (effects (font (size 1.27 1.27)) (justify right bottom))
     (uuid 6952efb2-11c9-4931-861c-ddce1a205e7e)
   )
-  (label "time_led" (at 106.68 50.8 0) (fields_autoplaced)
+  (label "run_led" (at 106.68 50.8 0) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 7926ceaa-f57b-4569-ab00-0362d9f54911)
   )
@@ -3053,7 +3052,7 @@
   (symbol (lib_id "Device:LED") (at 106.68 117.475 180) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid 026613f7-dba4-4317-9bde-e36b9b0aa5d8)
-    (property "Reference" "D1" (at 105.41 120.015 0)
+    (property "Reference" "D3" (at 105.41 120.015 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Value" "RUN" (at 101.6 116.205 0)
@@ -3079,7 +3078,7 @@
     (instances
       (project "dev_board"
         (path "/91657278-176c-4c3c-b7c8-7fab77e89520"
-          (reference "D1") (unit 1)
+          (reference "D3") (unit 1)
         )
       )
     )
@@ -3433,7 +3432,7 @@
   (symbol (lib_id "Device:R") (at 118.11 117.475 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid 257c4a02-999b-4317-a6fa-6962646e2e55)
-    (property "Reference" "R2" (at 118.11 114.935 90)
+    (property "Reference" "R4" (at 118.11 114.935 90)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Value" "1K" (at 119.38 117.475 90)
@@ -3459,7 +3458,7 @@
     (instances
       (project "dev_board"
         (path "/91657278-176c-4c3c-b7c8-7fab77e89520"
-          (reference "R2") (unit 1)
+          (reference "R4") (unit 1)
         )
       )
     )
@@ -4208,7 +4207,7 @@
   (symbol (lib_id "Device:R") (at 118.11 104.775 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid 85fb0763-5e48-4df5-a3ad-73750a326cae)
-    (property "Reference" "R4" (at 118.11 102.235 90)
+    (property "Reference" "R2" (at 118.11 102.235 90)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Value" "1K" (at 119.38 104.775 90)
@@ -4234,7 +4233,7 @@
     (instances
       (project "dev_board"
         (path "/91657278-176c-4c3c-b7c8-7fab77e89520"
-          (reference "R4") (unit 1)
+          (reference "R2") (unit 1)
         )
       )
     )
@@ -4728,7 +4727,7 @@
   (symbol (lib_id "Device:LED") (at 106.68 104.775 180) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid c938bdb4-097c-4885-a5a0-bcdb1b70a3fd)
-    (property "Reference" "D3" (at 105.41 107.315 0)
+    (property "Reference" "D1" (at 105.41 107.315 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Value" "TME" (at 101.6 103.505 0)
@@ -4754,7 +4753,7 @@
     (instances
       (project "dev_board"
         (path "/91657278-176c-4c3c-b7c8-7fab77e89520"
-          (reference "D3") (unit 1)
+          (reference "D1") (unit 1)
         )
       )
     )
