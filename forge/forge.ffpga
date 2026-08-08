@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<GPDProject version="40" oldestCompatibleVersion="32" GPDVersion="6.53.001" lastChange="3 Aug 2026 20:27:15" projectChecksumState="0" projectChecksum="0c9f626c">
+<GPDProject version="40" oldestCompatibleVersion="32" GPDVersion="6.53.001" lastChange="8 Aug 2026 10:13:53" projectChecksumState="0" projectChecksum="ef2e842f">
     <Metadata>
         <LegalNotice>This Design was generated using Renesas' proprietary Go Configure Software Hub and is provided for use solely in connection with Renesas GreenPAK integrated circuits. Any unauthorized use, reproduction, distribution, or manufacture of this Design is prohibited. This Design is provided 'AS IS' without warranties of any kind.</LegalNotice>
     </Metadata>
@@ -664,7 +664,6 @@
             <openedTab>Resources Report</openedTab>
             <openedTab>Timing Analysis</openedTab>
             <openedTab>Macrocell Editor</openedTab>
-            <openedTab>PLL Configurator</openedTab>
         </openedTabs>
         <pipelineStagesStates>
             <pipelineStageState>
@@ -785,10 +784,10 @@
                     <port-name>pll_refdiv[5]</port-name>
                 </record>
                 <record id="IOB_t[0:0]_xy[31:22]_out0">
-                    <port-name>run_led</port-name>
+                    <port-name>time_led</port-name>
                 </record>
                 <record id="IOB_t[0:0]_xy[31:22]_out1">
-                    <port-name>run_led_oe</port-name>
+                    <port-name>time_led_oe</port-name>
                 </record>
                 <record id="IOB_t[0:0]_xy[31:23]_out0">
                     <port-name>fault_led</port-name>
@@ -797,10 +796,10 @@
                     <port-name>fault_led_oe</port-name>
                 </record>
                 <record id="IOB_t[0:0]_xy[31:24]_out0">
-                    <port-name>time_led</port-name>
+                    <port-name>run_led</port-name>
                 </record>
                 <record id="IOB_t[0:0]_xy[31:24]_out1">
-                    <port-name>time_led_oe</port-name>
+                    <port-name>run_led_oe</port-name>
                 </record>
                 <record id="IOB_t[0:0]_xy[31:25]_in0">
                     <port-name>timeout_sw</port-name>
