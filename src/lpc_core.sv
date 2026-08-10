@@ -199,10 +199,13 @@ module lpc_core # (
 	end
 
 	// Do the rms compares
-	logic ct_lt_ref;
-	always @(posedge clk)
-		ct_lt_ref <= ( acc_ct < acc_ref ) ? 1'b1 : 1'b0;
-
+	logic ct_lt_ref, ct_le_ref, ct_ge_ref;
+	always @(posedge clk) begin
+		ct_lt_ref <= ( acc_ct[35-:18] <    acc_ref[35-:18] ) ? 1'b1 : 1'b0;
+		ct_le_ref <= ( acc_ct[35-:18] <= ( acc_ref[35-:18] + (acc_ref[35-:18] >> 6) ) ) ? 1'b1 : 1'b0; // for setup margin
+		ct_ge_ref <= ( acc_ct[35-:18] >= ( acc_ref[35-:18] - (acc_ref[35-:18] >> 6) ) ) ? 1'b1 : 1'b0;
+	end
+		
 	logic ct_gt_max;
 	always @(posedge clk)
 		ct_gt_max <= ( acc_ct > NUM_SAMPLE * MAX_RMS * MAX_RMS ) ? 1'b1 : 1'b0;
@@ -245,7 +248,7 @@ module lpc_core # (
 					( setup_sw && win_cnt[18-:3] == 3 ) ? toggle[2] :
 					( setup_sw && win_cnt[18-:3] == 4 ) ? toggle[1] :
 					( setup_sw && win_cnt[18-:3] == 5 ) ? toggle[0] :
-					( !setup_sw && win_tick ) ? !ct_lt_ref : time_led;
+					( !setup_sw && win_tick ) ? ct_ge_ref : time_led;
 	
 	// Over Current Logic
 	// 4 sec 15amp
@@ -298,7 +301,7 @@ module lpc_core # (
 	always @(posedge clk) 
 		ufl_flag <= ( reset ) ? 0 : 
 					( !pump_out ) ? 0 :
-					( timeout_cnt >= 5 && ltref_last && ct_lt_ref && win_tick ) ? 1 : ufl_flag;
+					( timeout_cnt >= 12 && ltref_last && ct_lt_ref && win_tick ) ? 1 : ufl_flag;
 					
 	// Short cycle / Empty fault
 	// Pumped for too short of time (~4sec)
@@ -335,7 +338,7 @@ module lpc_core # (
 								   fault;
 	always @(posedge clk) 
 		fault_led <= ( reset ) ? 0 : 
-					( !setup_sw ) ? ((win_tick) ? ct_lt_ref : fault_led) :
+					( !setup_sw ) ? ((win_tick) ? ct_le_ref : fault_led) :
 					( pump_out ) ? 0 :
 					( fault != 0 && win_cnt[2:0] == 0 || fault >= 2 && win_cnt[2:0] == 2 || fault == 3 && win_cnt[2:0] == 4 ) ? 1'b1 : 1'b0;
 
