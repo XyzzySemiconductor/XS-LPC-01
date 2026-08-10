@@ -50,10 +50,12 @@ async def test_project(dut):
     #check that flags are OK (and not X)
     assert dut.pump_out.value  == 1
     assert dut.time_led.value  == 1
-    assert dut.fault_led.value == 0
     assert dut.run_led.value   == 1
     # check RMS values
+    if GL_MODE:
+        assert dut.fault_led.value == 1
     if not GL_MODE:
+        assert dut.fault_led.value == 0
         assert int(dut.user_project.i_core.rms_hold_ct.value) < (1200*1200*3750)
         assert int(dut.user_project.i_core.rms_hold_ct.value) > (1000*1000*3750)
         assert int(dut.user_project.i_core.rms_hold_ref.value) < (600*600*3750)
