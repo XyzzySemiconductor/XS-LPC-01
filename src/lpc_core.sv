@@ -3,7 +3,7 @@
 // Wrapped by chip specific warapepr (ie project.,v)
 module lpc_core # (
    	// Physical parametersdd
-	parameter NUM_SAMPLE = 250, // 3750 for real time, 250 for 16x
+	parameter NUM_SAMPLE = 3750, // 3750 for real time, 250 for 16x
 	parameter MAX_RMS 	 = 1103 // max 15A RMS = 1103 current threshold
 ) (
 	// System

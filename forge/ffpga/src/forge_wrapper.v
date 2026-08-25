@@ -70,12 +70,12 @@
 				
 	// Create an internal reset 
 	reg [7:0] rst_cnt = 0;
-	reg reset = 0;
-	initial reset = 0;
+	reg reset = 1;
+	initial reset = 1;
 	initial rst_cnt = 0;
 	always @(posedge clk) begin
 		rst_cnt <= ( rst_cnt != 8'hff ) ? rst_cnt + 1 : rst_cnt;
-		reset <= ( rst_cnt == 8'hff ) ? 1'b1 : 1'b0;
+		reset <= ( rst_cnt == 8'hff ) ? 1'b0 : 1'b1;
 	end
 		
 	// Register ADC I/O
@@ -87,7 +87,10 @@
 	always @(posedge clk) miso_io <= adc_miso; 
 	
 	// PUMP Chip CORE emulation/test
-  	lpc_core i_core (
+    localparam REALTIME = 3750; // Must be 3750 for realtime!
+  	lpc_core #(
+        .NUM_SAMPLE( REALTIME )  // TT Is always real time 3750
+    ) i_core (
 		// System
 		.clk			( clk ),
 		.reset 		( reset ),

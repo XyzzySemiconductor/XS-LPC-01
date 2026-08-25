@@ -2,7 +2,7 @@
 
   (uuid 91657278-176c-4c3c-b7c8-7fab77e89520)
 
-  (paper "E")
+  (paper "A")
 
   (title_block
     (title "XS-LPC-DB Development Board")
@@ -1938,6 +1938,7 @@
       )
     )
   )
+
 
   (junction (at 124.46 117.475) (diameter 0) (color 0 0 0 0)
     (uuid 031b829b-1e93-4b6a-969e-6cbff82f8d54)

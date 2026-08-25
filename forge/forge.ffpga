@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<GPDProject version="40" oldestCompatibleVersion="32" GPDVersion="6.53.001" lastChange="8 Aug 2026 10:13:53" projectChecksumState="0" projectChecksum="ef2e842f">
+<GPDProject version="40" oldestCompatibleVersion="32" GPDVersion="6.53.001" lastChange="25 Aug 2026 16:34:43" projectChecksumState="0" projectChecksum="2f1bbc6f">
     <Metadata>
         <LegalNotice>This Design was generated using Renesas' proprietary Go Configure Software Hub and is provided for use solely in connection with Renesas GreenPAK integrated circuits. Any unauthorized use, reproduction, distribution, or manufacture of this Design is prohibited. This Design is provided 'AS IS' without warranties of any kind.</LegalNotice>
     </Metadata>
@@ -162,7 +162,7 @@
         <wire output="30" input="84" autoRouting="1" pen="#ff8000ff;1.00;1;32;128" lineType="2" protected="1" CWLid="18" wireText="NET18" wireState="0">
             <points>(695.00,669.00); (695.00,756.00)</points>
         </wire>
-        <wire output="80" input="39" autoRouting="1" pen="#ff8000ff;1.00;1;32;128" lineType="2" protected="1" CWLid="20" wireText="NET20" wireState="0">
+        <wire output="80" input="39" autoRouting="1" pen="#0293fdff;1.00;1;32;128" lineType="7" protected="1" CWLid="20" wireText="NET20" wireState="0">
             <points>(129.00,289.00); (116.00,289.00); (116.00,240.00); (308.00,240.00); (308.00,251.00); (320.00,251.00)</points>
         </wire>
         <wire output="34" input="67" autoRouting="1" pen="#0293fdff;1.00;1;32;128" lineType="7" protected="1" CWLid="21" wireText="NET21" wireState="0">
@@ -361,7 +361,7 @@
     <emulatorConfiguration version="4" oldestCompatibleVersion="4">
         <settings>
             <autoApply value="0"/>
-            <platformSelector id="-1"/>
+            <platformSelector id="7"/>
         </settings>
         <platform id="0" friendlyName="GreenPAK DIP Development Platform">
             <lastConfiguration modified="0">
@@ -659,11 +659,12 @@
         </settings>
         <openedTabs>
             <openedTab>I/O Planner</openedTab>
-            <openedTab>forge_wrapper.v</openedTab>
             <openedTab>Synthesis Report</openedTab>
             <openedTab>Resources Report</openedTab>
             <openedTab>Timing Analysis</openedTab>
-            <openedTab>Macrocell Editor</openedTab>
+            <openedTab>forge_wrapper.v</openedTab>
+            <openedTab>../../../src/lpc_core.sv</openedTab>
+            <openedTab>PLL Configurator</openedTab>
         </openedTabs>
         <pipelineStagesStates>
             <pipelineStageState>
@@ -689,7 +690,10 @@
             <placement-constraints/>
         </modules>
         <io-spec-tool>
-            <records filter="16">
+            <records filter="2">
+                <record id="CLK_t[0:0]_W_in1">
+                    <port-name>clk</port-name>
+                </record>
                 <record id="IOB_t[0:0]_xy[0:11]_out0">
                     <port-name>pll_clk_selection</port-name>
                 </record>
@@ -1031,10 +1035,10 @@
     </fpga-data>
     <projectData>
         <specs>
-            <lastModify lastModifyValue="04.08.2026 0:05:05"/>
+            <lastModify lastModifyValue="25.08.2026 12:01:51"/>
             <vddSpecs vddMin="1.05" vddTyp="1.1" vddMax="1.15"/>
             <vdd2Specs vdd2Min="3.25" vdd2Typ="3.3" vdd2Max="3.345"/>
-            <tempSpecs tempMin="-24" tempTyp="31" tempMax="85"/>
+            <tempSpecs tempMin="0" tempTyp="25" tempMax="85"/>
         </specs>
         <projectDataFields>
             <textLineDataField name="Customer Name" id="2" text=""/>
