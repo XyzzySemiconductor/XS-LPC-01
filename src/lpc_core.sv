@@ -75,12 +75,6 @@ module lpc_core # (
     // RMS Compute
 	////////////////
 	
-	// SregA[12]: Multiplier (bit-serial operand) for squaring (SHFIT up), SD, shift in adc msb first
-	// SregB[24]: Multiplicand (word operand, shifted >>> each cycle), shift in adc msb first
-	// sign: sign multipler bit from ADC first bit
-	// 0: acc_ct[36]: Partial product accumulator for CT*sin
-	// 1: acc_ref[36]: Partial product accumulator for CT*cos
-
 	// RMS Arch Data Registers
 	logic signed [35:0] acc_ct;
 	logic signed [35:0] acc_ref;
@@ -97,6 +91,7 @@ module lpc_core # (
 	logic sload; 	// forced add
 	logic clr_acc;  // clear all accumulators
 	logic wr_acc; 	// write acc this cycle
+	logic ld_ofs;	// Add vref offset (during setup)
 
 	// Sign register
 	always @(posedge clk) 
@@ -104,13 +99,17 @@ module lpc_core # (
 				( ld_sign ) ? (first_bit^sdata) : sign; // invert sign!!
 
 	// Srega/b
+	logic [11:0] ref_ofs;
+	assign ref_ofs = srega[22-:12] + 37; // add 0.5 amps rms 
 	always @(posedge clk) 
 		sregb <= ( reset  ) ? 0 :
+				 ( ld_ofs ) ? { ref_ofs, 11'b0 } :
 				 ( ld_sq  ) ? { sregb[21-:11], (first_bit^sdata), 11'b0 } : 
 				 ( shr_b  ) ? { sregb[22], sregb[22:1] } : // >>>
 							    sregb;
 	always @(posedge clk) 
 		srega <= ( reset ) ? 0 :
+				 ( ld_ofs ) ? { ref_ofs, 11'b0 } :
 				 ( ld_sq ) ? { srega[21-:11], (first_bit^sdata), 11'b0 } : 
 				 ( shl_a ) ? { srega[21:0], 1'b0 } : // <<<
 							   srega;
@@ -165,9 +164,9 @@ module lpc_core # (
 		state <= ( reset ) ? 0 :
 				 ( sstrb && !schan ) ? 0 : // clear for each channel
 				 ( state < 11 && ( first_bit || rem_bit )) ? state + 1 :
-				 ( state == 11 && rem_bit ) ? 16 :
+				 ( state == 11 && rem_bit ) ? 15 :
 				 ( state == 27 ) ? 0 :
-				 ( state >= 16 ) ? state + 1 : state;
+				 ( state >= 15 ) ? state + 1 : state;
 				 
 
 	// Clear all Accs for stype=0
@@ -178,22 +177,31 @@ module lpc_core # (
 		addr = schan; 		// Acc accumulator address
 		clr_acc = win_tick;	// clear all accumulators
 		// test state to drive square
-		if( state == 16 ) begin
+		if( state == 15 ) begin // offset cycle
+			shl_a = 0;
+			shr_b = 0;
+			sload = 0;
+			wr_acc = 0;
+			ld_ofs = ( schan && !setup_sw ) ? 1'b1 : 1'b0; // ch1 add ref ofs during setup
+		end else if( state == 16 ) begin
 			shl_a = 1;
 			shr_b = 1;
 			sload = 1; // select the '+1' arg
 			wr_acc = sign; // load '+1' if negative
+			ld_ofs = 0;
 		end else if( state > 16 && state < 28 ) begin
 			shl_a = 1; // Keep shifint and condiitonally addign
 			shr_b = 1;
 			wr_acc = 1;
 			sload = 0;
+			ld_ofs = 0;
 		end else begin
 			// defulat
 			shl_a = 0;
 			shr_b = 0;
 			sload = 0;
 			wr_acc = 0;
+			ld_ofs = 0;
 		end
 		// state should sit at 28 until done
 	end

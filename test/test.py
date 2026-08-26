@@ -58,8 +58,10 @@ async def test_project(dut):
         assert dut.fault_led.value == 0
         assert int(dut.user_project.i_core.rms_hold_ct.value) < (1200*1200*3750)
         assert int(dut.user_project.i_core.rms_hold_ct.value) > (1000*1000*3750)
-        assert int(dut.user_project.i_core.rms_hold_ref.value) < (600*600*3750)
-        assert int(dut.user_project.i_core.rms_hold_ref.value) > (500*500*3750)
+        assert int(dut.user_project.i_core.rms_hold_ct.value) == 4154053977
+        assert int(dut.user_project.i_core.rms_hold_ref.value) < (637*637*3750)
+        assert int(dut.user_project.i_core.rms_hold_ref.value) > (537*537*3750)
+        #assert int(dut.user_project.i_core.rms_hold_ref.value) == 1038448055
 
     # The following assersion is just an example of how to check the output values.
     # Change it to match the actual expected output of your module:
